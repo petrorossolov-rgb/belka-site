@@ -1,4 +1,4 @@
 # /home/deploy-belka/.ssh/authorized_keys — образец (T12 ставит на сервер с настоящими ключами).
 # Свой ключ на окружение; клиент не выбирает окружение и не получает shell.
-restrict,command="/usr/local/bin/belka-deploy prod" ssh-ed25519 AAAA...ключ-прода belka-deploy-prod
-restrict,command="/usr/local/bin/belka-deploy staging" ssh-ed25519 AAAA...ключ-стейджинга belka-deploy-staging
+restrict,command="/usr/local/bin/belka-deploy prod" ssh-ed25519 AAAA...ключ-прода belka-ci-prod
+restrict,command="/usr/local/bin/belka-deploy staging" ssh-ed25519 AAAA...ключ-стейджинга belka-ci-staging
