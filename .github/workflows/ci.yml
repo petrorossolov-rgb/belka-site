@@ -1,0 +1,22 @@
+# Гейты на каждый push (кроме main) и на каждый PR. Проверка PR —
+# required check `gates / gates-ok` для ветки main.
+name: ci
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    uses: ./.github/workflows/gates.yml
+    with:
+      site_env: production

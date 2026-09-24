@@ -1,0 +1,87 @@
+# Гейты качества — единственное место с шагами проверок (Constitution 8).
+# Вызывают ci.yml (push/PR) и deploy.yml (стейджинг, прод). Итог — задание
+# gates-ok: именно оно required check для main, имя не меняется.
+name: gates
+
+on:
+  workflow_call:
+    inputs:
+      site_env:
+        description: Окружение сборки — staging или production
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Проверка входа site_env
+        env:
+          SITE_ENV: ${{ inputs.site_env }}
+        run: |
+          case "$SITE_ENV" in
+            staging|production) ;;
+            *) echo "::error::site_env: неизвестное значение «$SITE_ENV», допустимо: staging, production"; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci
+
+      - name: Типы (astro check)
+        run: npm run check
+
+      - name: Тесты (vitest)
+        run: npm test
+
+      - name: shellcheck обёртки деплоя
+        run: shellcheck infra/deploy/belka-deploy infra/deploy/tests/belka-deploy.test.sh
+
+      - name: Тест обёртки деплоя
+        run: bash infra/deploy/tests/belka-deploy.test.sh
+
+      - name: Сборка
+        env:
+          SITE_ENV: ${{ inputs.site_env }}
+        run: npm run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ inputs.site_env }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  # Итог гейтов. Задание без условия было бы пропущено при упавшем гейте, а
+  # пропущенное задание GitHub засчитывает required check как успех. Поэтому
+  # оно запускается всегда и само падает, если хоть одно задание не success
+  # (в том числе failure, cancelled, skipped). Это не обход гейта, а его замок.
+  gates-ok:
+    name: gates-ok
+    needs: [gates]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Все гейты зелёные
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -e 'to_entries | length > 0 and all(.value.result == "success")' > /dev/null || {
+            echo "::error::Гейты не прошли:"
+            echo "$NEEDS" | jq -r 'to_entries[] | "  \(.key): \(.value.result)"'
+            exit 1
+          }
