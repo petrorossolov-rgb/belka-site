@@ -1,0 +1,35 @@
+---
+// Плашка черновика: только на черновых записях и только там, где черновики видны
+// (стейджинг и разработка). В прод-сборку черновики не попадают вовсе.
+import { isStaging } from '../lib/content';
+
+interface Props {
+  draft: boolean;
+}
+
+const visible = Astro.props.draft && isStaging();
+---
+
+{
+  visible && (
+    <div class="draft-banner" role="note">
+      <p class="draft-banner__text">Черновик — страница не опубликована</p>
+    </div>
+  )
+}
+
+<style>
+  .draft-banner {
+    padding: var(--space-xs) var(--gutter);
+    background: var(--color-draft-bg);
+    color: var(--color-text);
+    text-align: center;
+  }
+
+  .draft-banner__text {
+    font-family: var(--font-code);
+    font-size: var(--text-eyebrow);
+    letter-spacing: var(--letter-spacing-caps);
+    text-transform: uppercase;
+  }
+</style>

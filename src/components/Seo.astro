@@ -1,0 +1,18 @@
+---
+// Минимальный SEO-слой: заголовок, описание (T08) и noindex вне прода (T16).
+// Canonical, OG и JSON-LD — полный слой в T21.
+import { SITE_ENV } from 'astro:env/server';
+import { indexable } from '../lib/site-env';
+
+interface Props {
+  /** Готовый `<title>`: страница сама решает, нужен ли суффикс с именем сайта. */
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<title>{title}</title>
+<meta name="description" content={description} />
+{!indexable(SITE_ENV) && <meta name="robots" content="noindex, nofollow" />}

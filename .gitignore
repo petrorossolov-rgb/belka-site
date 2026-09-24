@@ -1,0 +1,21 @@
+# Зависимости и сборка
+node_modules/
+dist/
+draft-routes.json
+.astro/
+
+# Документы — отдельный приватный репозиторий belka-site-docs (plan.md → «Публичный репозиторий кода»)
+docs/
+
+# Окружение и секреты
+.env*
+
+# Отчёты Lighthouse CI
+.lighthouseci/
+
+# Локальные настройки Claude Code
+.claude/settings.local.json
+
+# Системный мусор
+.DS_Store
+Thumbs.db

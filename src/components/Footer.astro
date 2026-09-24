@@ -1,0 +1,96 @@
+---
+// Подвал: имя и слоган, © год сборки и имя; контакты, реквизиты и меню — только непустые.
+import { getNav, getSite } from '../lib/content';
+import { visibleContacts, visibleLegal } from '../lib/content-core';
+
+interface Props {
+  /** false — имя и слоган уже стоят на странице крупно (заглушка): в подвале только строка ©. */
+  brand?: boolean;
+}
+
+const { brand = true } = Astro.props;
+const site = await getSite();
+const contacts = visibleContacts(site);
+const legal = visibleLegal(site);
+const nav = await getNav('footer');
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container site-footer__inner">
+    {
+      brand && (
+        <div>
+          <p class="site-footer__name">{site.name}</p>
+          <p>{site.slogan}</p>
+        </div>
+      )
+    }
+    {
+      contacts.length > 0 && (
+        <ul class="site-footer__list" role="list">
+          {contacts.map((item) => (
+            <li>
+              <a href={item.href}>{item.text}</a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    {
+      legal.length > 0 && (
+        <ul class="site-footer__list" role="list">
+          {legal.map((item) => (
+            <li>{item.text}</li>
+          ))}
+        </ul>
+      )
+    }
+    {
+      nav.length > 0 && (
+        <nav aria-label="Меню в подвале">
+          <ul class="site-footer__list" role="list">
+            {nav.map((item) => (
+              <li>
+                <a href={item.href}>{item.label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )
+    }
+    <p class="site-footer__copy">©&nbsp;{year} {site.name}</p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-block-start: var(--border-width) solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--text-small);
+  }
+
+  .site-footer__inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md) var(--space-2xl);
+    padding-block: var(--space-lg);
+  }
+
+  .site-footer__name {
+    color: var(--color-text);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .site-footer__list {
+    display: grid;
+    gap: var(--space-2xs);
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-footer__copy {
+    align-self: end;
+    margin-inline-start: auto;
+  }
+</style>

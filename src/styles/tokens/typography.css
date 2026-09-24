@@ -1,0 +1,34 @@
+/* Примитивы ДС: копия docs/inputs/design-belka/design/tokens/typography.css без изменений значений.
+   Не перенесены: Google Fonts (tokens/fonts.css целиком), стеки --font-sans / --font-mono
+   (их объявляет Fonts API из self-host файлов), правила элементов. */
+/* Белка — типографика. Onest везде, IBM Plex Mono для кодов. */
+:root {
+  /* --font-sans и --font-mono объявляет Fonts API (astro.config.mjs, блок fonts). */
+
+  /* Шкала — web (плотность средняя, база 13/14) */
+  --fs-2xs: 11px;
+  --fs-xs:  12px;
+  --fs-sm:  13px;
+  --fs-base:14px;
+  --fs-md:  16px;
+  --fs-lg:  18px;
+  --fs-xl:  22px;
+  --fs-2xl: 26px;
+  --fs-3xl: 32px;
+  --fs-4xl: 40px;
+  --fs-5xl: 56px;
+
+  /* ТСД / упаковочный стол — крупнее, читаемо с метра */
+  --fs-rf-label: 11px;
+  --fs-rf-body:  16px;
+  --fs-rf-code:  28px;
+  --fs-rf-qty:   44px;
+
+  --lh-tight: 1.1;
+  --lh-snug:  1.25;
+  --lh-normal:1.5;
+
+  --tracking-tight: -0.02em;
+  --tracking-display: -0.03em;
+  --tracking-caps: 0.14em;
+}

@@ -1,0 +1,58 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "rules": {
+    "color-no-hex": true,
+    "color-named": "never",
+    "function-disallowed-list": ["rgb", "rgba", "hsl", "hsla", "oklch", "color-mix"],
+    "declaration-property-unit-disallowed-list": {
+      "font-size": ["px", "rem", "em", "ms", "s"],
+      "/^margin/": ["px", "rem", "em", "ms", "s"],
+      "/^padding/": ["px", "rem", "em", "ms", "s"],
+      "/^(row-|column-)?gap$/": ["px", "rem", "em", "ms", "s"],
+      "/^inset/": ["px", "rem", "em", "ms", "s"],
+      "/^(top|right|bottom|left)$/": ["px", "rem", "em", "ms", "s"],
+      "/^border(-[a-z]+)*-radius$/": ["px", "rem", "em", "ms", "s"],
+      "/^border(-[a-z]+)*-width$/": ["px", "rem", "em", "ms", "s"],
+      "/^transition/": ["px", "rem", "em", "ms", "s"],
+      "/^animation/": ["px", "rem", "em", "ms", "s"],
+      "box-shadow": ["px", "rem", "em", "ms", "s"],
+      "/^(max-)?width$/": ["px", "rem", "em", "ms", "s"],
+      "line-height": ["px", "rem", "em", "ms", "s"],
+      "letter-spacing": ["px", "rem", "em", "ms", "s"]
+    },
+    "selector-class-pattern": [
+      "^[a-z][a-z0-9]*(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$",
+      { "message": "Класс «%s»: kebab-case с элементами и модификаторами BEM (block__element--modifier)" }
+    ],
+    "import-notation": "string",
+    "color-hex-length": "long"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.astro"],
+      "customSyntax": "postcss-html",
+      "rules": {
+        "selector-pseudo-class-no-unknown": [true, { "ignorePseudoClasses": ["global"] }]
+      }
+    },
+    {
+      "files": ["src/styles/tokens/**", "src/styles/theme.css"],
+      "rules": {
+        "color-no-hex": null,
+        "color-named": null,
+        "function-disallowed-list": null,
+        "declaration-property-unit-disallowed-list": null
+      }
+    },
+    {
+      "files": ["src/styles/tokens/**"],
+      "rules": {
+        "alpha-value-notation": null,
+        "color-function-alias-notation": null,
+        "color-function-notation": null,
+        "comment-empty-line-before": null,
+        "custom-property-empty-line-before": null
+      }
+    }
+  ]
+}

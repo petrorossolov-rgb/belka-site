@@ -1,0 +1,44 @@
+---
+// Каркас любой страницы (Constitution 2, 3, 6). Единственная точка подключения
+// скриптов — сейчас их нет: клиентского JS на сайте ноль.
+import { Font } from 'astro:assets';
+import DraftBanner from '../components/DraftBanner.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import Seo from '../components/Seo.astro';
+import SkipLink from '../components/SkipLink.astro';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Черновая запись: маркер `data-draft` в любом окружении, плашка — там, где черновики видны. */
+  draft?: boolean;
+  /** Страница сама показывает знак и слоган крупно (заглушка): шапка без знака, подвал без имени и слогана. */
+  brandScreen?: boolean;
+}
+
+const { title, description, draft = false, brandScreen = false } = Astro.props;
+---
+
+<!doctype html>
+<html lang="ru" data-draft={draft ? '' : undefined}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <Seo title={title} description={description} />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <Font cssVariable="--font-sans" preload />
+    <Font cssVariable="--font-mono" />
+  </head>
+  <body>
+    <SkipLink />
+    <DraftBanner draft={draft} />
+    <Header logo={!brandScreen} />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer brand={!brandScreen} />
+  </body>
+</html>

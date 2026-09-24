@@ -1,0 +1,14 @@
+# Глобальные настройки сайта. Одна запись `site` (лоадер `file`).
+# nameRu не заполняется до решения ep02; contacts, legal, metrika, seo — пусто до ep02 и ep05.
+site:
+  name: Belka SCM
+  slogan: Знает, где что лежит.
+  url: https://belkascm.ru
+  contacts: {}
+  legal: {}
+  flags:
+    legalEntityReady: false
+    metrikaEnabled: false
+    showReadiness: false
+  metrika: {}
+  seo: {}

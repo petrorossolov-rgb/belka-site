@@ -1,0 +1,32 @@
+---
+// Выход из тупика. Сборка кладёт страницу в dist/404.html, nginx отдаёт её через error_page (T15).
+// Текст утверждён владельцем 2026-09-24 (гейт A); финальная 404 — ep02.
+import Base from '../layouts/Base.astro';
+import { getSite } from '../lib/content';
+
+const site = await getSite();
+---
+
+<Base
+  title={`Страница не найдена — ${site.name}`}
+  description="Такой страницы нет: возможно, адрес набран с ошибкой или страница ещё не опубликована."
+>
+  <section class="container not-found">
+    <h1>Такой страницы нет</h1>
+    <p>Возможно, адрес набран с ошибкой или страница ещё не опубликована.</p>
+    <p><a href="/">На главную</a></p>
+  </section>
+</Base>
+
+<style>
+  .not-found {
+    display: grid;
+    gap: var(--space-md);
+    margin-block: auto;
+    padding-block: var(--space-section);
+  }
+
+  .not-found > * {
+    max-width: var(--measure);
+  }
+</style>

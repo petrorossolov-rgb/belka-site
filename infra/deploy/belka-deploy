@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# belka-deploy — единственная точка входа CI на сервере (plan.md → «Контракт деплоя»).
+# Вызывается только как forced command из authorized_keys пользователя deploy-belka:
+#   restrict,command="/usr/local/bin/belka-deploy prod" <ключ прода>
+#   restrict,command="/usr/local/bin/belka-deploy staging" <ключ стейджинга>
+# Окружение задаёт authorized_keys, клиент передаёт только команду (SSH_ORIGINAL_COMMAND):
+#   release <sha>    + tar.gz сборки на stdin → releases/<sha>, current → releases/<sha>
+#   activate <sha>   current → уже выложенный releases/<sha> (откат, повторная активация)
+# <sha> — ровно 40 hex-символов в нижнем регистре.
+#
+# Успех: «activated <sha>» в stdout, код 0. Ошибки (current не меняется):
+#   2  — activate неизвестного релиза («unknown release»)
+#   64 — неверный вызов или команда; ничего не читается и не пишется
+#   65 — негодный архив: пустой, не tar.gz, без index.html, абсолютные пути, «..»,
+#        любые записи, кроме файлов и каталогов (симлинки, жёсткие ссылки, устройства)
+#   1  — прочие сбои
+# Хранятся 5 последних релизов по времени выкладки; текущий не удаляется никогда.
+#
+# BELKA_DEPLOY_ROOT подменяет /srv/belkascm только в тестах: по SSH её не передать
+# (restrict, AcceptEnv только LANG LC_*, PermitUserEnvironment выключен).
+set -euo pipefail
+export LC_ALL=C
+umask 022
+
+readonly KEEP=5
+readonly SHA_RE='^[0-9a-f]{40}$'
+readonly COMMAND_RE='^(release|activate) ([0-9a-f]{40})$'
+
+root=''
+releases=''
+cleanup_paths=()
+
+die() {
+  local code=$1
+  shift
+  printf 'belka-deploy: %s\n' "$*" >&2
+  exit "$code"
+}
+
+cleanup() {
+  if ((${#cleanup_paths[@]} > 0)); then
+    rm -rf -- "${cleanup_paths[@]}"
+  fi
+}
+trap cleanup EXIT
+
+# Пути и типы записей архива проверяются до распаковки.
+check_archive() {
+  local archive=$1 listing types i name has_index=false
+  local -a names kinds
+
+  listing=$(tar -tzf "$archive" 2>/dev/null) || die 65 'архив не читается как tar.gz'
+  [[ -n $listing ]] || die 65 'архив пуст'
+  # Первый символ подробного списка — тип записи: «-» файл, «d» каталог, «l» симлинк, «h» жёсткая ссылка…
+  types=$(tar -tvzf "$archive" 2>/dev/null | cut -c1) || die 65 'архив не читается как tar.gz'
+  mapfile -t names <<<"$listing"
+  mapfile -t kinds <<<"$types"
+  ((${#names[@]} == ${#kinds[@]})) || die 65 'список записей архива не разобран'
+
+  for i in "${!names[@]}"; do
+    name=${names[i]}
+    case ${kinds[i]} in
+      - | d) ;;
+      *) die 65 "запрещённый тип записи «${kinds[i]}»: $name" ;;
+    esac
+    [[ $name != /* ]] || die 65 "абсолютный путь: $name"
+    [[ ! $name =~ (^|/)\.\.(/|$) ]] || die 65 "путь с «..»: $name"
+    if [[ ${name#./} == index.html && ${kinds[i]} == - ]]; then
+      has_index=true
+    fi
+  done
+  [[ $has_index == true ]] || die 65 'в корне архива нет index.html'
+}
+
+# Оставляет KEEP самых свежих релизов и текущий, остальные удаляет.
+prune() {
+  local current=$1 seen=0 sha
+  while read -r _ sha; do
+    [[ $sha =~ $SHA_RE ]] || continue
+    seen=$((seen + 1))
+    if ((seen > KEEP)) && [[ $sha != "$current" ]]; then
+      rm -rf -- "${releases:?}/$sha"
+    fi
+  done < <(find "$releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' | sort -rn)
+}
+
+# Атомарное переключение: новая ссылка рядом, затем rename(2) поверх current.
+activate() {
+  local sha=$1 link="$root/.current-$$"
+  cleanup_paths+=("$link")
+  ln -sfn "releases/$sha" "$link"
+  mv -T -- "$link" "$root/current"
+  prune "$sha"
+  printf 'activated %s\n' "$sha"
+}
+
+release() {
+  local sha=$1 archive target="$releases/$1" staging_dir="$releases/.tmp-$1"
+
+  archive=$(mktemp "$releases/.upload-XXXXXX")
+  cleanup_paths+=("$archive")
+  cat >"$archive"
+  [[ -s $archive ]] || die 65 'пустой stdin: архив не передан'
+  check_archive "$archive"
+
+  # Повторный release того же SHA: архив проверен, уже выложенный каталог не трогаем.
+  if [[ ! -d $target ]]; then
+    rm -rf -- "$staging_dir"
+    cleanup_paths+=("$staging_dir")
+    mkdir -- "$staging_dir"
+    tar -xzf "$archive" -C "$staging_dir" --no-same-owner --no-same-permissions ||
+      die 65 'архив не распаковался'
+    chmod -R go-w,a+rX -- "$staging_dir"
+    touch -- "$staging_dir" # время выкладки, а не сборки: по нему считаются 5 последних
+    mv -T -- "$staging_dir" "$target"
+  fi
+  activate "$sha"
+}
+
+main() {
+  (($# == 1)) || die 64 'использование: belka-deploy <prod|staging>'
+  case $1 in
+    prod | staging) ;;
+    *) die 64 "окружение «$1»: допустимо prod, staging" ;;
+  esac
+
+  local command=${SSH_ORIGINAL_COMMAND:-}
+  [[ $command =~ $COMMAND_RE ]] || die 64 'команда не распознана: ожидается «release <sha>» или «activate <sha>»'
+  local action=${BASH_REMATCH[1]} sha=${BASH_REMATCH[2]}
+
+  root="${BELKA_DEPLOY_ROOT:-/srv/belkascm}/$1"
+  releases="$root/releases"
+  [[ -d $releases ]] || die 1 "нет каталога $releases"
+
+  case $action in
+    release) release "$sha" ;;
+    activate)
+      [[ -d $releases/$sha ]] || die 2 'unknown release'
+      activate "$sha"
+      ;;
+  esac
+}
+
+main "$@"

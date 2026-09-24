@@ -1,0 +1,104 @@
+/* ============================================================
+   Тема сайта belkascm.ru — вторая ступень токенов.
+   Примитивы ДС (./tokens/*.css) → семантика сайта. Компоненты и global.css
+   ссылаются только на токены этого файла; это единственное место сайта,
+   где живут числа, цвета и длительности.
+   Выравнивание с новой ДС — правка ./tokens/ и маппинга ниже.
+
+   Точки перелома (в @media пишутся литералом, переменные там не работают):
+     360px  — минимальная ширина макета
+     48rem  — 768px, планшет
+     64rem  — 1024px, ноутбук
+     90rem  — 1440px, верхняя граница плавной шкалы
+   Плавные значения clamp() растут линейно от 360px до 1440px.
+   ============================================================ */
+:root {
+  /* Цвета. Самый светлый текстовый цвет — bark-600; bark-400 для текста не используется.
+     Рыжий #C4552A (rust-500) — плашки, крупный текст, знак, фокус; ссылки и мелкий
+     текст — rust-600 ради контраста AA (plan.md → Key Decisions). */
+  --color-bg: var(--bk-milk-50);
+  --color-surface: #FFFFFF;
+  --color-text: var(--bk-bark-900);
+  --color-text-muted: var(--bk-bark-600);
+  --color-link: var(--bk-rust-600);
+  --color-accent: var(--bk-rust-500);
+  --color-on-accent: var(--bk-milk-50);
+  --color-border: var(--bk-oat-200);
+  --color-focus: var(--bk-rust-500);
+  --color-selection: var(--bk-rust-100);
+
+  /* Плашка «черновик» — тонированная, как статус «внимание» ДС: мёд-100 и основной текст. */
+  --color-draft-bg: var(--bk-honey-100);
+
+  /* Гарнитуры: стеки с fallback-метриками объявляет Fonts API. */
+  --font-body: var(--font-sans);
+  --font-code: var(--font-mono);
+
+  /* Маркетинговая шкала, 360px → 1440px */
+  --text-display: clamp(2.5rem, 1.8333rem + 2.963vw, 4.5rem);   /* 40 → 72 */
+  --text-h1: clamp(2rem, 1.5rem + 2.2222vw, 3.5rem);             /* 32 → 56 */
+  --text-h2: clamp(1.625rem, 1.3333rem + 1.2963vw, 2.5rem);      /* 26 → 40 */
+  --text-h3: clamp(1.25rem, 1.125rem + 0.5556vw, 1.625rem);      /* 20 → 26 */
+  --text-body: clamp(1rem, 0.9583rem + 0.1852vw, 1.125rem);      /* 16 → 18 */
+  --text-small: clamp(0.875rem, 0.8542rem + 0.0926vw, 0.9375rem);/* 14 → 15 */
+  --text-eyebrow: clamp(0.75rem, 0.7292rem + 0.0926vw, 0.8125rem);/* 12 → 13 */
+
+  /* Начертания, интерлиньяж, трекинг */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  --font-weight-heavy: 800;
+  --leading-tight: var(--lh-tight);
+  --leading-snug: var(--lh-snug);
+  --leading-body: var(--lh-normal);
+  --letter-spacing-display: var(--tracking-display);
+  --letter-spacing-heading: var(--tracking-tight);
+  --letter-spacing-caps: var(--tracking-caps);
+
+  /* Раскладка */
+  --container-max: 75rem;                                       /* 1200 */
+  --gutter: clamp(1rem, 0.6667rem + 1.4815vw, 2rem);            /* 16 → 32 */
+  --space-section: clamp(3rem, 2rem + 4.4444vw, 6rem);          /* 48 → 96 */
+  --measure: 40rem;                                             /* текстовая колонка, 640 */
+
+  /* Отступы внутри блоков — сетка 4px ДС */
+  --space-2xs: var(--space-1);
+  --space-xs: var(--space-2);
+  --space-sm: var(--space-3);
+  --space-md: var(--space-4);
+  --space-lg: var(--space-6);
+  --space-xl: var(--space-7);
+  --space-2xl: var(--space-8);
+
+  /* Формы */
+  --radius-field: var(--radius-sm);
+  --radius-control: var(--radius-md);
+  --radius-card: var(--radius-lg);
+  --radius-badge: var(--radius-pill);
+  --border-width: 1px;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --link-underline-offset: 0.15em;
+
+  /* Знак: пропорции lockup из guidelines/brand-logo.html (знак 64, словесный знак 30, зазор 14) */
+  --logo-lockup-gap-ratio: calc(14 / 64);
+  --logo-lockup-wordmark-ratio: calc(30 / 64);
+
+  /* Видимая высота знака; растр Logo.astro — не меньше её (size ≥ высоты). */
+  --logo-header-h: 2rem;                                        /* 32 */
+  --logo-hero-h: clamp(5.25rem, 4rem + 5.5556vw, 9rem);         /* 84 → 144: lockup 292 → 500 в ширину */
+
+  /* Движение */
+  --motion-duration-fast: var(--dur-fast);
+  --motion-duration-base: var(--dur-base);
+  --motion-duration-slow: var(--dur-slow);
+  --motion-ease: var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0s;
+    --motion-duration-base: 0s;
+    --motion-duration-slow: 0s;
+  }
+}

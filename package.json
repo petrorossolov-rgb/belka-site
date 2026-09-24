@@ -1,0 +1,33 @@
+{
+  "name": "belka-site",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "build:favicons": "node scripts/build-favicons.mjs",
+    "preview": "astro preview",
+    "check": "astro check",
+    "test": "vitest run",
+    "lint:css": "stylelint \"src/**/*.{css,astro}\" --max-warnings 0",
+    "check:docs": "node scripts/check-docs.mjs"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "3.7.4",
+    "astro": "7.3.4",
+    "sharp": "0.35.4"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@fontsource-variable/onest": "5.3.1",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "postcss-html": "2.0.0",
+    "stylelint": "17.15.0",
+    "stylelint-config-standard": "40.0.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

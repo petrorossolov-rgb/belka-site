@@ -1,0 +1,94 @@
+---
+// Единственная точка вывода знака Belka SCM (Constitution 3). Растры не перекрашиваются
+// и не обрезаются; замена на SVG, когда он появится, — правка только этого файла.
+import { Picture } from 'astro:assets';
+import mark from '../assets/brand/mark-rust.png';
+import wordmarkBark from '../assets/brand/wordmark-latin-bark.png';
+import wordmarkMilk from '../assets/brand/wordmark-latin-milk.png';
+import wordmarkRust from '../assets/brand/wordmark-latin-rust.png';
+import { logoLayout, type LogoVariant } from '../lib/logo';
+
+type Common = {
+  variant?: LogoVariant;
+  /**
+   * Высота растра в CSS px; больше предела (половина исходника) — обрезается. Видимую
+   * высоту можно задать токеном: `--logo-height` у предка (не больше `size`).
+   */
+  size: number;
+  /** Цвет словесного знака: кора на светлом, молоко на тёмном и рыжем. */
+  tone?: 'bark' | 'milk' | 'rust';
+  class?: string;
+};
+
+// Либо текстовая альтернатива, либо явная пометка, что рядом уже есть имя.
+type Props = Common & ({ alt: string; decorative?: never } | { decorative: true; alt?: never });
+
+const { variant = 'lockup', size, tone = 'bark', class: className } = Astro.props;
+const alt = Astro.props.decorative ? '' : Astro.props.alt;
+const hidden = Astro.props.decorative ? 'true' : undefined;
+const layout = logoLayout(variant, size);
+const wordmark = { bark: wordmarkBark, milk: wordmarkMilk, rust: wordmarkRust }[tone];
+const formats: Array<'avif' | 'webp'> = ['avif', 'webp'];
+const densities = [1, 2];
+---
+
+<span
+  class:list={['logo', `logo--${variant}`, className]}
+  style={`--logo-size: ${layout.height}px`}
+>
+  {
+    layout.mark && (
+      <Picture
+        src={mark}
+        formats={formats}
+        densities={densities}
+        width={layout.mark.width}
+        height={layout.mark.height}
+        alt={alt ?? ''}
+        aria-hidden={hidden}
+        loading="eager"
+      />
+    )
+  }
+  {
+    layout.wordmark && (
+      <Picture
+        src={wordmark}
+        formats={formats}
+        densities={densities}
+        width={layout.wordmark.width}
+        height={layout.wordmark.height}
+        alt={variant === 'lockup' ? '' : (alt ?? '')}
+        class="logo__wordmark"
+        aria-hidden={variant === 'lockup' ? 'true' : hidden}
+        loading="eager"
+      />
+    )
+  }
+</span>
+
+<style>
+  .logo {
+    --logo-mark-h: var(--logo-height, var(--logo-size));
+
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .logo--lockup {
+    gap: calc(var(--logo-mark-h) * var(--logo-lockup-gap-ratio));
+  }
+
+  /* Высота из CSS, ширина — по пропорции атрибутов width/height: макет не прыгает. */
+  .logo :global(img) {
+    display: block;
+    max-width: none;
+    width: auto;
+    height: var(--logo-mark-h);
+  }
+
+  .logo--lockup :global(img.logo__wordmark) {
+    height: calc(var(--logo-mark-h) * var(--logo-lockup-wordmark-ratio));
+  }
+</style>

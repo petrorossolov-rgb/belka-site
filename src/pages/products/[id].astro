@@ -1,0 +1,41 @@
+---
+// Минимальная страница продукта (ep01): имя, `short`, тело Markdown. Маршруты — только
+// продукты с `hasPage`, видимые в текущем окружении; полный шаблон — ep03.
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import { getProductPages, getSite, type Product } from '../../lib/content';
+
+export async function getStaticPaths() {
+  const products = await getProductPages();
+  return products.map((product) => ({ params: { id: product.id }, props: { product } }));
+}
+
+interface Props {
+  product: Product;
+}
+
+const { product } = Astro.props;
+const site = await getSite();
+const { Content } = await render(product);
+const { name, short, summary, seo, draft } = product.data;
+---
+
+<Base title={`${seo?.title ?? name} — ${site.name}`} description={seo?.description ?? summary} draft={draft}>
+  <article class="container product">
+    <p class="eyebrow">{short}</p>
+    <h1>{name}</h1>
+    <Content />
+  </article>
+</Base>
+
+<style>
+  .product {
+    display: grid;
+    gap: var(--space-md);
+    padding-block: var(--space-section);
+  }
+
+  .product > :global(*) {
+    max-width: var(--measure);
+  }
+</style>

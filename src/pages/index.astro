@@ -1,0 +1,72 @@
+---
+// Заглушка-визитка ep01 из `pages/index.md` (`hero`) и `site.yaml`; в ep02 её место займёт главная.
+// Имя не дублируется: заголовок — lockup с alt = site.name, текстом имя не повторяется.
+import Logo from '../components/Logo.astro';
+import Base from '../layouts/Base.astro';
+import { getSite, getVisible } from '../lib/content';
+
+const site = await getSite();
+const page = (await getVisible('pages')).find((entry) => entry.id === 'index');
+if (page === undefined) {
+  throw new Error('src/content/pages/index.md: нет видимой записи главной страницы');
+}
+const { title, description, draft, hero } = page.data;
+---
+
+<Base title={title} description={description} draft={draft} brandScreen>
+  <section class="container stub">
+    {hero?.eyebrow && <p class="eyebrow">{hero.eyebrow}</p>}
+    <h1 class="stub__title">
+      <Logo variant="lockup" size={145} alt={site.name} />
+    </h1>
+    {hero?.lead && <p class="stub__lead">{hero.lead}</p>}
+    {hero?.accent && <p class="stub__accent">{hero.accent}</p>}
+    {hero?.note && <p class="stub__note">{hero.note}</p>}
+    <p class="stub__slogan">{site.slogan}</p>
+  </section>
+</Base>
+
+<style>
+  .stub {
+    display: grid;
+    gap: var(--space-lg);
+    justify-items: start;
+    margin-block: auto;
+    padding-block: var(--space-section);
+  }
+
+  .stub > * {
+    max-width: var(--measure);
+  }
+
+  .stub__title {
+    --logo-height: var(--logo-hero-h);
+
+    margin-block-end: var(--space-xs);
+  }
+
+  .stub__lead {
+    font-size: var(--text-h3);
+    line-height: var(--leading-snug);
+  }
+
+  .stub__accent {
+    padding: var(--space-md) var(--space-lg);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  .stub__note {
+    color: var(--color-text-muted);
+    font-size: var(--text-small);
+  }
+
+  .stub__slogan {
+    color: var(--color-accent);
+    font-size: var(--text-h3);
+    font-weight: var(--font-weight-heavy);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--letter-spacing-heading);
+  }
+</style>

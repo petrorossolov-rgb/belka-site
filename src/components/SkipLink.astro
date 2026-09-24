@@ -1,0 +1,26 @@
+---
+// Первая ссылка страницы: по Tab появляется и переводит к основному содержанию.
+---
+
+<a class="skip-link" href="#main">Перейти к содержанию</a>
+
+<style>
+  .skip-link {
+    position: absolute;
+    inset-block-start: var(--space-sm);
+    inset-inline-start: var(--gutter);
+    z-index: 1;
+    padding: var(--space-xs) var(--space-md);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+    color: var(--color-link);
+    font-weight: var(--font-weight-medium);
+    transform: translateY(-200%);
+    transition: transform var(--motion-duration-fast) var(--motion-ease);
+  }
+
+  .skip-link:focus-visible {
+    transform: none;
+  }
+</style>

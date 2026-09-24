@@ -1,0 +1,47 @@
+---
+// Страницы из `pages/*.md`, кроме главной: маршрут = id (`legal/privacy` → /legal/privacy/).
+// В ep01 таких страниц нет; первые появятся в ep02.
+import { render } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import { getSite, getVisible, type Page } from '../lib/content';
+
+export async function getStaticPaths() {
+  const pages = await getVisible('pages');
+  return pages.filter((page) => page.id !== 'index').map((page) => ({ params: { slug: page.id }, props: { page } }));
+}
+
+interface Props {
+  page: Page;
+}
+
+const { page } = Astro.props;
+const site = await getSite();
+const { Content } = await render(page);
+const { title, description, draft, hero } = page.data;
+---
+
+<Base title={`${title} — ${site.name}`} description={description} draft={draft}>
+  <article class="container page">
+    {hero?.eyebrow && <p class="eyebrow">{hero.eyebrow}</p>}
+    <h1>{title}</h1>
+    {hero?.lead && <p class="page__lead">{hero.lead}</p>}
+    <Content />
+  </article>
+</Base>
+
+<style>
+  .page {
+    display: grid;
+    gap: var(--space-md);
+    padding-block: var(--space-section);
+  }
+
+  .page > :global(*) {
+    max-width: var(--measure);
+  }
+
+  .page__lead {
+    font-size: var(--text-h3);
+    line-height: var(--leading-snug);
+  }
+</style>

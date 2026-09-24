@@ -1,0 +1,33 @@
+/* Примитивы ДС: копия docs/inputs/design-belka/design/tokens/spacing.css без изменений.
+   Компоненты используют семантику из ../theme.css. */
+/* Белка — отступы, радиусы, тени, движение. Сетка 4px. */
+:root {
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-7: 32px; --space-8: 48px; --space-9: 64px;
+
+  /* Радиусы — мягкие, но не «пилюли» на карточках */
+  --radius-sm: 4px;    /* инпуты, кнопки в таблицах, чипы кода */
+  --radius-md: 8px;    /* кнопки, пункты меню */
+  --radius-lg: 14px;   /* карточки, панели, устройство */
+  --radius-pill: 999px;/* статус-бейджи, поиск */
+
+  /* Тени — тёплые, редкие. Карточки на молоке без тени. */
+  --shadow-1: 0 1px 2px rgba(42, 31, 26, 0.06);
+  --shadow-2: 0 4px 12px rgba(42, 31, 26, 0.08), 0 1px 2px rgba(42, 31, 26, 0.05);
+  --shadow-3: 0 16px 40px rgba(42, 31, 26, 0.14), 0 2px 6px rgba(42, 31, 26, 0.06);
+
+  /* Плотность web */
+  --row-h: 36px;       /* строка таблицы */
+  --control-h: 32px;   /* инпут, кнопка default */
+  --control-h-lg: 40px;
+  --rail-w: 240px;
+  --topbar-h: 56px;
+  --drawer-w: 480px;
+
+  /* ТСД — минимальная цель нажатия 48px */
+  --rf-target: 48px;
+  --rf-action-h: 56px;
+
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --dur-fast: 120ms; --dur-base: 200ms; --dur-slow: 300ms;
+}
