@@ -1,0 +1,7 @@
+# lychee — гейт ссылок собранного сайта (Constitution 7: ссылки ведут только на
+# существующие страницы). В CI: `lychee --config lychee.toml --root-dir <абс. путь к dist> 'dist/**/*.html'`.
+# Внешние ссылки не гейт: проверяются только ссылки внутри сборки, включая якоря.
+# Документы (docs/**/*.md, CLAUDE.md, progress.md) — локальный гейт `npm run check:docs`.
+offline = true
+include_fragments = "anchor-only"
+no_progress = true

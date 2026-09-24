@@ -13,7 +13,9 @@
     "check": "astro check",
     "test": "vitest run",
     "lint:css": "stylelint \"src/**/*.{css,astro}\" --max-warnings 0",
-    "check:docs": "node scripts/check-docs.mjs"
+    "check:docs": "node scripts/check-docs.mjs",
+    "lhci:mobile": "lhci autorun --config=lighthouserc.mobile.cjs",
+    "lhci:desktop": "lhci autorun --config=lighthouserc.desktop.cjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.4",
@@ -24,6 +26,7 @@
     "@astrojs/check": "0.9.10",
     "@fontsource-variable/onest": "5.3.1",
     "@fontsource/ibm-plex-mono": "5.3.0",
+    "@lhci/cli": "0.15.1",
     "postcss-html": "2.0.0",
     "stylelint": "17.15.0",
     "stylelint-config-standard": "40.0.0",
