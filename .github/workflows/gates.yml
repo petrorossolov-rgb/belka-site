@@ -1,6 +1,14 @@
 # Гейты качества — единственное место с шагами проверок (Constitution 8).
 # Вызывают ci.yml (push/PR) и deploy.yml (стейджинг, прод). Итог — задание
 # gates-ok: именно оно required check для main, имя не меняется.
+#
+# Каждый вызов собирает production и прогоняет на ней полный набор: SEO-проверки
+# и Lighthouse имеют смысл только там, staging намеренно отдаёт noindex. При
+# site_env=staging тот же вызов дополнительно собирает staging в dist-staging/
+# и проверяет её (check-dist-seo staging, lychee). Artifacts: dist-production,
+# dist-staging (только при staging), draft-routes.json (черновые маршруты
+# staging-сборки при site_env=staging, иначе прод-сборки — пустой список),
+# .lighthouseci. Выкладка берёт только artifact своего окружения.
 name: gates
 
 on:
@@ -48,20 +56,93 @@ jobs:
         run: npm test
 
       - name: shellcheck обёртки деплоя
-        run: shellcheck infra/deploy/belka-deploy infra/deploy/tests/belka-deploy.test.sh
+        run: |
+          shellcheck --version | head -2
+          shellcheck infra/deploy/belka-deploy infra/deploy/tests/belka-deploy.test.sh
 
       - name: Тест обёртки деплоя
         run: bash infra/deploy/tests/belka-deploy.test.sh
 
-      - name: Сборка
+      - name: Токены стилей (stylelint)
+        run: npm run lint:css
+
+      # --- production: полный набор ---
+
+      - name: Сборка production
         env:
-          SITE_ENV: ${{ inputs.site_env }}
+          SITE_ENV: production
         run: npm run build
+
+      - name: check-dist-seo production
+        run: node scripts/check-dist-seo.mjs production --dist dist --out draft-routes.json
+
+      - name: Ссылки production (lychee)
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          lycheeVersion: v0.24.2
+          args: --config lychee.toml --root-dir ${{ github.workspace }}/dist 'dist/**/*.html'
+          fail: true
+          failIfEmpty: true
+
+      - name: Lighthouse CI — мобайл
+        run: npm run lhci:mobile
+
+      - name: Lighthouse CI — десктоп
+        run: npm run lhci:desktop
+
+      # Отчёты нужны и при упавшем Lighthouse — для разбора. Это не гейт, а его вывод.
+      - name: Отчёты Lighthouse
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: .lighthouseci
+          path: .lighthouseci/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # --- staging: дополнительная сборка и её проверки ---
+
+      - name: Сборка staging
+        if: inputs.site_env == 'staging'
+        env:
+          SITE_ENV: staging
+        run: npm run build -- --outDir dist-staging
+
+      - name: check-dist-seo staging
+        if: inputs.site_env == 'staging'
+        run: node scripts/check-dist-seo.mjs staging --dist dist-staging --out draft-routes.json
+
+      - name: Ссылки staging (lychee)
+        if: inputs.site_env == 'staging'
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          lycheeVersion: v0.24.2
+          args: --config lychee.toml --root-dir ${{ github.workspace }}/dist-staging 'dist-staging/**/*.html'
+          fail: true
+          failIfEmpty: true
+
+      # --- artifacts сборок (только после всех гейтов) ---
 
       - uses: actions/upload-artifact@v7
         with:
-          name: dist-${{ inputs.site_env }}
+          name: dist-production
           path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - if: inputs.site_env == 'staging'
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-staging
+          path: dist-staging/
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: draft-routes.json
+          path: draft-routes.json
           if-no-files-found: error
           retention-days: 14
 
