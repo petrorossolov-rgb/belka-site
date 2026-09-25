@@ -3,7 +3,7 @@ name: Belka SupplyPortal  # рабочее имя, утверждается до
 short: SupplyPortal
 domain: portal
 kind: platform
-mapOrder: 2
+mapOrder: 1
 summary: "Заглушка ep01: описание ещё не утверждено."
 readiness: in-development  # скрыто: выводится только при site.flags.showReadiness
 ---
