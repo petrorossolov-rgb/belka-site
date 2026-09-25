@@ -1,7 +1,7 @@
 ---
 name: Belka YMS
 short: YMS
-domain: yard
+domain: yardd
 kind: platform
 mapOrder: 3
 summary: "Заглушка ep01: описание ещё не утверждено."
