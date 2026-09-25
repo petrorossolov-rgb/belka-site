@@ -139,11 +139,15 @@ curl -si -H 'Host: www.belkascm.ru' http://127.0.0.1/       # 200
 curl -si -H 'Host: staging.belkascm.ru' http://127.0.0.1/   # 200, X-Robots-Tag: noindex, nofollow
 curl -si http://127.0.0.1/                                  # пустой ответ: соединение закрыто (444)
 curl -si -H 'Host: unknown.example' http://127.0.0.1/       # то же
+echo | openssl s_client -connect 127.0.0.1:443 -servername unknown.example
+                                                            # alert 112 unrecognized name, сертификата нет
 ```
 
 Catch-all меняет поведение только для голого IP и неизвестных доменов: раньше
-там отвечал соседний сайт, теперь соединение закрывается. Его блок на 443
-(`ssl_reject_handshake on`) и HTTPS-блоки belkascm — в T15.
+там отвечал соседний сайт, теперь соединение закрывается. Блок на 443
+(`ssl_reject_handshake on`) поставлен **до DNS** belkascm.ru: пока у нас нет
+своих сертификатов, HTTPS к belkascm.ru отклоняется на рукопожатии, а не
+получает сертификат соседа. HTTPS-блоки belkascm — в T15.
 
 Логи — `/var/log/nginx/belkascm*.log`; системный logrotate nginx хранит их 14 дней.
 
