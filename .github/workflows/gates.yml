@@ -5,10 +5,13 @@
 # Каждый вызов собирает production и прогоняет на ней полный набор: SEO-проверки
 # и Lighthouse имеют смысл только там, staging намеренно отдаёт noindex. При
 # site_env=staging тот же вызов дополнительно собирает staging в dist-staging/
-# и проверяет её (check-dist-seo staging, lychee). Artifacts: dist-production,
-# dist-staging (только при staging), draft-routes.json (черновые маршруты
-# staging-сборки при site_env=staging, иначе прод-сборки — пустой список),
-# .lighthouseci. Выкладка берёт только artifact своего окружения.
+# и проверяет её (check-dist-seo, check-voice, check-layout, lychee): черновые
+# секции видны только в staging-сборке. Линтер голоса и гейт адаптива идут на
+# обеих сборках; check-layout открывает страницы в системном Chrome раннера.
+# Artifacts: dist-production, dist-staging (только при staging),
+# draft-routes.json (черновые маршруты staging-сборки при site_env=staging,
+# иначе прод-сборки — пустой список), .lighthouseci. Выкладка берёт только
+# artifact своего окружения.
 # Вход ref (SHA) задаёт промоушн в прод: он проверяет и собирает SHA со стейджинга,
 # а не HEAD ветки, на которой запущен workflow.
 name: gates
@@ -99,6 +102,12 @@ jobs:
       - name: check-dist-seo production
         run: node scripts/check-dist-seo.mjs production --dist dist --out draft-routes.json
 
+      - name: check-voice production
+        run: node scripts/check-voice.mjs --dist dist --env production
+
+      - name: check-layout production
+        run: node scripts/check-layout.mjs --dist dist
+
       - name: Ссылки production (lychee)
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
@@ -135,6 +144,14 @@ jobs:
       - name: check-dist-seo staging
         if: inputs.site_env == 'staging'
         run: node scripts/check-dist-seo.mjs staging --dist dist-staging --out draft-routes.json
+
+      - name: check-voice staging
+        if: inputs.site_env == 'staging'
+        run: node scripts/check-voice.mjs --dist dist-staging --env staging
+
+      - name: check-layout staging
+        if: inputs.site_env == 'staging'
+        run: node scripts/check-layout.mjs --dist dist-staging
 
       - name: Ссылки staging (lychee)
         if: inputs.site_env == 'staging'
