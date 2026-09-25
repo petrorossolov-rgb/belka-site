@@ -2,7 +2,8 @@
 #
 # push в main → gates(staging) → выкладка dist-staging на staging.belkascm.ru → смоук.
 # workflow_dispatch (sha, по умолчанию HEAD main) → проверка, что SHA уже выложен на
-# стейджинг → gates на этом SHA → выкладка dist-production на belkascm.ru → смоук.
+# стейджинг и что гейты и infra/deploy не менялись между SHA и HEAD main (promote-guard.sh)
+# → gates на этом SHA → выкладка dist-production на belkascm.ru → смоук.
 #
 # Выкладывается artifact из прогона gates этого же workflow, а не новая сборка вне гейтов.
 # Промоушн вызывает gates с тем же входом site_env: staging, что и стейджинг: прод-сборка
@@ -92,6 +93,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: read
+      contents: read
       deployments: read
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
@@ -137,6 +139,29 @@ jobs:
             echo "::error::SHA не выложен на стейджинг: $SHA"
             exit 1
           fi
+
+      # gates.yml (reusable) и infra/deploy в этом прогоне — из HEAD main, сборка — из SHA.
+      # Промоушн SHA ≠ HEAD разрешён, только если между ними не менялись .github/ и
+      # infra/deploy/: иначе прод прошёл бы не те гейты, что стейджинг (Constitution 9).
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: infra/deploy
+
+      - name: Гейты и деплой-контур — те же, что у стейджинга
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.sha.outputs.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -o pipefail
+          if [[ "$SHA" == "$HEAD_SHA" ]]; then
+            echo "Промоушн HEAD main — гейты и деплой-контур те же"
+            exit 0
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/compare/$SHA...$HEAD_SHA" \
+            --jq '.status, (.files | length), (.files[] | .filename, (.previous_filename // empty))' \
+            | bash infra/deploy/promote-guard.sh
 
   gates-production:
     name: gates
