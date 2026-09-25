@@ -1,6 +1,7 @@
 ---
 // Каркас любой страницы (Constitution 2, 3, 6). Единственная точка подключения
 // скриптов — сейчас их нет: клиентского JS на сайте ноль.
+import type { ImageMetadata } from 'astro';
 import { Font } from 'astro:assets';
 import DraftBanner from '../components/DraftBanner.astro';
 import Footer from '../components/Footer.astro';
@@ -10,15 +11,20 @@ import SkipLink from '../components/SkipLink.astro';
 import '../styles/global.css';
 
 interface Props {
+  /** Готовый `<title>` — через `buildTitle` из `lib/seo.ts`. */
   title: string;
   description: string;
   /** Черновая запись: маркер `data-draft` в любом окружении, плашка — там, где черновики видны. */
   draft?: boolean;
   /** Страница сама показывает знак и слоган крупно (заглушка): шапка без знака, подвал без имени и слогана. */
   brandScreen?: boolean;
+  /** `false` — у страницы нет своего адреса (404): без canonical и `og:url`. */
+  canonical?: boolean;
+  /** Картинка превью (`page.ogImage`); иначе `site.seo.defaultOgImage`. */
+  ogImage?: ImageMetadata | undefined;
 }
 
-const { title, description, draft = false, brandScreen = false } = Astro.props;
+const { title, description, draft = false, brandScreen = false, canonical = true, ogImage } = Astro.props;
 ---
 
 <!doctype html>
@@ -26,7 +32,7 @@ const { title, description, draft = false, brandScreen = false } = Astro.props;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <Seo title={title} description={description} />
+    <Seo title={title} description={description} canonical={canonical} ogImage={ogImage} />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <Font cssVariable="--font-sans" preload />

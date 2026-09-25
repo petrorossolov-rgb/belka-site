@@ -4,6 +4,7 @@
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import { getProductPages, getSite, type Product } from '../../lib/content';
+import { buildTitle, productTitle } from '../../lib/seo';
 
 export async function getStaticPaths() {
   const products = await getProductPages();
@@ -20,7 +21,7 @@ const { Content } = await render(product);
 const { name, short, summary, seo, draft } = product.data;
 ---
 
-<Base title={`${seo?.title ?? name} — ${site.name}`} description={seo?.description ?? summary} draft={draft}>
+<Base title={buildTitle(productTitle(product.data), site.name)} description={seo?.description ?? summary} draft={draft}>
   <article class="container product">
     <p class="eyebrow">{short}</p>
     <h1>{name}</h1>

@@ -3,13 +3,15 @@
 // Текст утверждён владельцем 2026-09-24 (гейт A); финальная 404 — ep02.
 import Base from '../layouts/Base.astro';
 import { getSite } from '../lib/content';
+import { buildTitle } from '../lib/seo';
 
 const site = await getSite();
 ---
 
 <Base
-  title={`Страница не найдена — ${site.name}`}
+  title={buildTitle('Страница не найдена', site.name)}
   description="Такой страницы нет: возможно, адрес набран с ошибкой или страница ещё не опубликована."
+  canonical={false}
 >
   <section class="container not-found">
     <h1>Такой страницы нет</h1>

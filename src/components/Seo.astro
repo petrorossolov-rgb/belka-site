@@ -1,18 +1,51 @@
 ---
-// Минимальный SEO-слой: заголовок, описание (T08) и noindex вне прода (T16).
-// Canonical, OG и JSON-LD — полный слой в T21.
+// SEO-слой страницы (T21): заголовок, описание, noindex вне прода (T16), canonical,
+// Open Graph, `twitter:card` и JSON-LD `Organization`. Правила — в `lib/seo.ts`.
+// Canonical и абсолютные URL — от `site.yaml → url` в любом окружении.
+import type { ImageMetadata } from 'astro';
+import { getImage } from 'astro:assets';
 import { SITE_ENV } from 'astro:env/server';
+// Знак здесь не выводится на страницу (это делает только `Logo.astro`): нужен лишь URL
+// растра для `logo` в JSON-LD. Растр не перекрашивается и не обрезается.
+import mark from '../assets/brand/mark-rust.png';
+import { getSite } from '../lib/content';
+import { logoLayout, maxLogoHeight } from '../lib/logo';
+import { assetUrl, canonicalUrl, organizationJsonLd, serializeJsonLd, socialMeta } from '../lib/seo';
 import { indexable } from '../lib/site-env';
 
 interface Props {
-  /** Готовый `<title>`: страница сама решает, нужен ли суффикс с именем сайта. */
+  /** Готовый `<title>` (`buildTitle`): страница сама решает, нужен ли суффикс с именем сайта. */
   title: string;
   description: string;
+  /** `false` — у страницы нет своего адреса (404): без canonical и `og:url`. */
+  canonical?: boolean;
+  /** Картинка превью; иначе `site.seo.defaultOgImage`, иначе без `og:image`. */
+  ogImage?: ImageMetadata | undefined;
 }
 
-const { title, description } = Astro.props;
+const { title, description, canonical = true, ogImage } = Astro.props;
+const site = await getSite();
+
+const url = canonical ? canonicalUrl(site.url, Astro.url.pathname) : undefined;
+
+const preview = ogImage ?? site.seo.defaultOgImage;
+const image =
+  preview === undefined
+    ? undefined
+    : assetUrl(site.url, (await getImage({ src: preview, format: preview.format === 'jpg' ? 'jpg' : 'png' })).src);
+
+const markSize = logoLayout('mark', maxLogoHeight('mark')).mark;
+const logo = await getImage({ src: mark, format: 'png', width: markSize?.width, height: markSize?.height });
+const jsonLd = serializeJsonLd(organizationJsonLd(site, assetUrl(site.url, logo.src)));
 ---
 
 <title>{title}</title>
 <meta name="description" content={description} />
 {!indexable(SITE_ENV) && <meta name="robots" content="noindex, nofollow" />}
+{url && <link rel="canonical" href={url} />}
+{
+  socialMeta({ title, description, siteName: site.name, url, image }).map(({ attr, key, content }) =>
+    attr === 'property' ? <meta property={key} content={content} /> : <meta name={key} content={content} />,
+  )
+}
+<script type="application/ld+json" set:html={jsonLd} is:inline />

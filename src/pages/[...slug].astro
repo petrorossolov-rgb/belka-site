@@ -4,6 +4,7 @@
 import { render } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import { getSite, getVisible, type Page } from '../lib/content';
+import { buildTitle } from '../lib/seo';
 
 export async function getStaticPaths() {
   const pages = await getVisible('pages');
@@ -17,10 +18,10 @@ interface Props {
 const { page } = Astro.props;
 const site = await getSite();
 const { Content } = await render(page);
-const { title, description, draft, hero } = page.data;
+const { title, description, draft, hero, ogImage } = page.data;
 ---
 
-<Base title={`${title} — ${site.name}`} description={description} draft={draft}>
+<Base title={buildTitle(title, site.name)} description={description} draft={draft} ogImage={ogImage}>
   <article class="container page">
     {hero?.eyebrow && <p class="eyebrow">{hero.eyebrow}</p>}
     <h1>{title}</h1>
