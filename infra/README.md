@@ -28,6 +28,7 @@ IP сервера, имя соседнего сайта и ключи в реп�
 | `certbot/renewal-hooks/deploy/belkascm-reload-nginx` | `/etc/letsencrypt/renewal-hooks/deploy/` (`root:root 0755`) |
 | `monitor/check-site.sh` | на сервер не ставится: его запускает `.github/workflows/monitor.yml` |
 | `deploy/ci-deploy.sh`, `deploy/smoke.sh` | на сервер не ставятся: выкладка и смоук из `.github/workflows/deploy.yml` (и отката) |
+| `deploy/promote-guard.sh`, `deploy/tests/*` | на сервер не ставятся: проверка промоушна в `deploy.yml` и тесты в `gates.yml` |
 
 ## Пользователь и деплой (T12)
 
@@ -120,6 +121,13 @@ failed`), `scp`, `sftp` и проброс портов не проходят (`r
 
 Этот шаг обязан предшествовать DNS: в nginx соседнего сайта нет
 `default_server`, и без наших блоков belkascm.ru открыл бы соседний сайт.
+
+Конфиги этого этапа — версии из коммита `37d5aab` (последний коммит T13):
+`git show 37d5aab:infra/nginx/<файл> > <файл>` для `00-default.conf`,
+`belkascm.ru.conf` и `staging.belkascm.ru.conf`. Текущие `belkascm.ru.conf` и
+`staging.belkascm.ru.conf` уже содержат HTTPS-блоки (T15) и без сертификатов не
+пройдут `nginx -t`. Проверки ниже — для версий T13; после T15 все три имени по HTTP
+отвечают 301 на `https://`.
 
 ```sh
 # До: состояние чужих конфигов.
@@ -235,5 +243,5 @@ curl -s https://belkascm.ru/nope                     # 404, тело — 404.htm
 ```
 
 Откат шага: вернуть HTTP-версии `belkascm.ru.conf` и `staging.belkascm.ru.conf`
-из git (T13), удалить симлинк `belkascm-maps.conf`, `nginx -t`, `reload`.
+из коммита `37d5aab` (T13), удалить симлинк `belkascm-maps.conf`, `nginx -t`, `reload`.
 Сертификаты и htpasswd откат не мешают.
