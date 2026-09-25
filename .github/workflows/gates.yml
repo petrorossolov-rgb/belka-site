@@ -55,10 +55,11 @@ jobs:
       - name: Тесты (vitest)
         run: npm test
 
-      - name: shellcheck обёртки деплоя
+      - name: shellcheck скриптов infra
         run: |
           shellcheck --version | head -2
-          shellcheck infra/deploy/belka-deploy infra/deploy/tests/belka-deploy.test.sh
+          shellcheck infra/deploy/belka-deploy infra/deploy/tests/belka-deploy.test.sh \
+            infra/certbot/renewal-hooks/deploy/belkascm-reload-nginx infra/monitor/check-site.sh
 
       - name: Тест обёртки деплоя
         run: bash infra/deploy/tests/belka-deploy.test.sh
