@@ -32,6 +32,14 @@
 - **actionlint — через Docker**: `MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/repo" -w /repo rhysd/actionlint:latest -no-color` (в образе есть shellcheck для `run:`). В YAML `run: echo "…: …"` без блочного скаляра не парсится — двоеточие с пробелом; такие строки — через `run: |`. (ep01 T17)
 - **Автоматический режим Claude не выполняет без явного «да» владельца в этой же сессии** `gh workflow run deploy.yml|rollback.yml` (выкладка в окружения) и, как правило, `gh pr merge` («Merge Without Review»; в сессии I первый merge прошёл, второй — нет). Эти шаги собираются в один список и подтверждаются владельцем заранее. (ep01 T17)
 
+- **Контракты каркаса для ep02+** (ep01 T25):
+  - **«Продукт — это файл»**: `getCollection`/`getEntry` вызываются только в `src/lib/content.ts`; страницы и компоненты берут данные через его функции (`getVisible`, `getNav`, `getPlatformMap`, `getProductPages`, …). Новый продукт — файл `src/content/products/{id}.md` по схеме; навигация, карта и sitemap строятся из коллекций, ручных списков нет. Проверка — `grep -rn "getCollection|getEntry" src` находит только `content.ts`.
+  - **Токены**: литералы цвета, размеров, отступов, радиусов и движения — только в `src/styles/tokens/**` и `src/styles/theme.css`; механически держит Stylelint (см. выше «Две ступени токенов» и «Stylelint»).
+  - **`SITE_ENV`-модель черновиков**: `production` исключает `draft: true` отовсюду (маршруты, навигация, sitemap); `staging` и `development` показывают черновик с плашкой и маркером `<html data-draft>`, всё окружение — `noindex` и `Disallow: /`. `check-dist-seo` пишет маршруты черновиков в `draft-routes.json`, смоук прода проверяет, что они отдают 404. Правила — только в `src/lib/site-env.ts` и `content-core.ts`.
+  - **Гейты — только в `.github/workflows/gates.yml`**: `ci.yml`, `deploy.yml` вызывают его, своих проверок не имеют. Новый гейт — шаг в `gates.yml` и, если это отдельное задание, пункт `needs` у `gates-ok`; без `continue-on-error`, условий и `|| true`.
+- **SEO-слой — `src/lib/seo.ts` + `Seo.astro`**: страница передаёт в `Base` готовый `title` через `buildTitle(title, site.name, { home })` (у продукта — `productTitle`), `ogImage` из записи. Canonical и `og:url` — `canonicalUrl(site.url, Astro.url.pathname)` от `site.yaml → url` в любом окружении (на стейджинге тоже прод-адрес). Страница без своего адреса (404) передаёт `canonical={false}`: без canonical и `og:url`; `noindex` ей не ставить — LHCI меряет SEO на `/404.html`. JSON-LD — только `Organization` из `site.yaml`, без персон (тест `seo.test.ts`); сериализация — `serializeJsonLd` (экранирует `<`, `>`, `&`). (ep01 T21)
+- **Инструмент записи файлов Claude превращает escape-последовательности U+2028/U+2029 (обратная косая черта, «u2028») в сырые символы-разделители строк** — TS/JS перестаёт разбираться, Markdown ломается. Такие символы в коде — через `String.fromCharCode(0x2028)`; экранированную форму в строке-результате вписывать скриптом с `String.fromCharCode(92)` и проверять `cat -v` (пример — `serializeJsonLd` в `src/lib/seo.ts`). (ep01 T21)
+
 ## Docs Debt
 <!-- Items logged by /my-execute, /my-change, /my-incident. Resolved by /my-sync-docs. -->
 
@@ -43,7 +51,9 @@
 ## Follow-ups
 <!-- Tasks deferred from /my-incident or /my-change that need proper implementation later. -->
 
-- [ ] 2026-09-25 TTL зоны belkascm.ru в reg.ru — 86400, а не 300 (B2). Перед любой правкой зоны сначала снизить TTL до 300 и дождаться истечения старого; окончательное значение — в T25. (ep01 T14)
+- [ ] 2026-09-25 TTL зоны belkascm.ru в reg.ru — 86400 (B2 предполагал 300 на время запуска). Перед любой правкой зоны снизить TTL до 300 и дождаться истечения старого; после правки и недели стабильности вернуть рабочее значение (3600 и выше). Решение по окончательному значению — владельца. (ep01 T14, T25)
+- [ ] 2026-09-25 HSTS: поднять `Strict-Transport-Security` с `max-age=300` до `max-age=31536000` после недели стабильности HTTPS (не раньше 2026-10-02) — правка `infra/nginx/snippets/security-headers.conf` через PR, установка на сервер по runbook. `includeSubDomains` и `preload` — только отдельным решением: они задевают `staging` и любые будущие поддомены. Смоук значение `max-age` не сверяет. (ep01 T25)
+- [ ] 2026-09-25 `monitor.yml`: GitHub отключает scheduled workflows через 60 дней без коммитов в репозитории. Если между эпиками пауза дольше ~50 дней — пустой коммит или `gh workflow enable monitor.yml`; статус — `gh workflow list`. Порядок — `docs/runbooks/deploy.md`. (ep01 T19, T25)
 - [ ] 2026-09-25 Сертификат соседнего сайта на VPS не продлевается: его A/AAAA указывают на хостинг reg.ru, `certbot renew --dry-run` по нему — failure (404 от чужого сервера). Истекает 2026-11-13. Решение владельца: вернуть DNS соседа на VPS или убрать его сертификат и vhost. Наши сертификаты от этого не зависят. (ep01 T15)
 
 - [ ] 2026-09-24 Когда владелец переедет на свой CI или хостинг git, вернуть код и документы в один приватный контур: lychee по `docs/` — снова шаг CI, снимок ДС можно оставить. Архив прежней истории — `C:\Proj\WMS\belka-site-history.git`. (ep01, разделение репозитория)
