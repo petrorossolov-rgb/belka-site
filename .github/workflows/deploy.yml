@@ -1,0 +1,192 @@
+# Доставка (T17, plan.md → B8, «Контракт CI»; Constitution 7, 8, 9).
+#
+# push в main → gates(staging) → выкладка dist-staging на staging.belkascm.ru → смоук.
+# workflow_dispatch (sha, по умолчанию HEAD main) → проверка, что SHA уже выложен на
+# стейджинг → gates на этом SHA → выкладка dist-production на belkascm.ru → смоук.
+#
+# Выкладывается artifact из прогона gates этого же workflow, а не новая сборка вне гейтов.
+# Промоушн вызывает gates с тем же входом site_env: staging, что и стейджинг: прод-сборка
+# проходит ровно те же гейты, а staging-сборка того же SHA даёт draft-routes.json, по
+# которому смоук прода проверяет, что черновики на проде отдают 404.
+# Выкладка и смоук — шаги одного job с environment: успешный deployment в GitHub означает
+# «выложено и смоук зелёный». Откат — rollback.yml, та же concurrency-группа deploy-<env>.
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: SHA коммита для промоушна в прод (40 hex); пусто — HEAD main. Должен быть уже выложен на стейджинг
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # --- стейджинг: push в main ---
+
+  gates-staging:
+    name: gates
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/gates.yml
+    with:
+      site_env: staging
+
+  staging:
+    name: staging
+    needs: gates-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: staging
+      url: https://staging.belkascm.ru/
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: infra/deploy
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-staging
+          path: artifacts/dist-staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: draft-routes.json
+          path: artifacts
+
+      - name: Выкладка
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          SHA: ${{ github.sha }}
+        run: bash infra/deploy/ci-deploy.sh release "$SHA" artifacts/dist-staging
+
+      - name: Смоук
+        env:
+          STAGING_BASIC_AUTH: ${{ secrets.STAGING_BASIC_AUTH }}
+        run: bash infra/deploy/smoke.sh staging --dist artifacts/dist-staging --draft-routes artifacts/draft-routes.json
+
+      - name: Итог
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          echo "Стейджинг: выложен \`$SHA\`, смоук зелёный." >> "$GITHUB_STEP_SUMMARY"
+
+  # --- прод: ручной промоушн SHA со стейджинга ---
+
+  verify:
+    name: verify
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      deployments: read
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - name: SHA промоушна
+        id: sha
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          HEAD_SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          if [[ "$REF" != refs/heads/main ]]; then
+            echo "::error::Промоушн запускается только с main, а не с $REF"
+            exit 1
+          fi
+          sha="${INPUT_SHA:-$HEAD_SHA}"
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::sha: ожидается 40 hex-символов в нижнем регистре, получено «$sha»"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Промоушн: $sha"
+
+      # Две проверки. Deployment в окружение staging с успешным статусом (статус
+      # «success» мог смениться на «inactive» после следующей выкладки — ищем его в
+      # истории). И успешный push-прогон deploy.yml на этом SHA: deployment создаёт и
+      # rollback.yml, но с SHA запуска, а не отката, — одного deployment мало.
+      - name: SHA выложен на стейджинг
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          deployed=false
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/deployments?sha=$SHA&environment=staging&per_page=100" --jq '.[].id'); do
+            if [[ "$(gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses?per_page=100" --jq 'any(.[]; .state == "success")')" == true ]]; then
+              deployed=true
+              break
+            fi
+          done
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?head_sha=$SHA&event=push&status=success&per_page=1" --jq '.total_count')
+          echo "deployment staging success: $deployed; успешных push-прогонов deploy: $runs"
+          if [[ "$deployed" != true || "$runs" -lt 1 ]]; then
+            echo "::error::SHA не выложен на стейджинг: $SHA"
+            exit 1
+          fi
+
+  gates-production:
+    name: gates
+    needs: verify
+    uses: ./.github/workflows/gates.yml
+    with:
+      site_env: staging
+      ref: ${{ needs.verify.outputs.sha }}
+
+  production:
+    name: production
+    needs: [verify, gates-production]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://belkascm.ru/
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: infra/deploy
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-production
+          path: artifacts/dist-production
+
+      # Черновые маршруты staging-сборки того же SHA: на проде они должны отдавать 404.
+      - uses: actions/download-artifact@v8
+        with:
+          name: draft-routes.json
+          path: artifacts
+
+      - name: Выкладка
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          SHA: ${{ needs.verify.outputs.sha }}
+        run: bash infra/deploy/ci-deploy.sh release "$SHA" artifacts/dist-production
+
+      - name: Смоук
+        run: bash infra/deploy/smoke.sh production --dist artifacts/dist-production --draft-routes artifacts/draft-routes.json
+
+      - name: Итог
+        env:
+          SHA: ${{ needs.verify.outputs.sha }}
+        run: |
+          echo "Прод: выложен \`$SHA\` (со стейджинга), смоук зелёный." >> "$GITHUB_STEP_SUMMARY"
