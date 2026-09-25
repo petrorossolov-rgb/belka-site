@@ -1,0 +1,99 @@
+# Откат (T18, plan.md → B10, «Контракт CI»; Constitution 9).
+#
+# workflow_dispatch (environment, sha) → «activate <sha>» через belka-deploy → смоук окружения.
+# Без сборки: активируется релиз, уже лежащий на сервере (там хранятся 5 последних и
+# текущий; более старый — код 2, unknown release, current не меняется). Ключи — только в
+# секретах окружений GitHub: ручной вход на сервер ради отката — правка мимо git.
+# concurrency deploy-<env> — та же группа, что у deploy.yml: откат не идёт одновременно
+# с выкладкой. Черновые маршруты для смоука берутся из artifact push-прогона deploy.yml
+# этого SHA; если artifact уже удалён (14 дней), смоук явно пишет, что их не проверял.
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Окружение
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      sha:
+        description: SHA релиза на сервере (40 hex) — см. docs/runbooks/deploy.md, «Откат»
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    name: rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    environment:
+      name: ${{ inputs.environment }}
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - name: Проверка входов
+        env:
+          SHA: ${{ inputs.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          if [[ "$REF" != refs/heads/main ]]; then
+            echo "::error::Откат запускается только с main, а не с $REF"
+            exit 1
+          fi
+          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ || "$SHA" =~ ^0{40}$ ]]; then
+            echo "::error::sha: ожидается SHA релиза из 40 hex-символов (технический релиз 0000…0 не активируется), получено «$SHA»"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: infra/deploy
+
+      - name: Черновые маршруты сборки
+        id: routes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?head_sha=$SHA&event=push&status=success&per_page=1" --jq '.workflow_runs[0].id // empty')
+          if [[ -n "$run_id" ]] && gh run download "$run_id" --repo "$GITHUB_REPOSITORY" -n draft-routes.json -D artifacts; then
+            echo "args=--draft-routes artifacts/draft-routes.json" >> "$GITHUB_OUTPUT"
+            echo "draft-routes.json из прогона $run_id: $(cat artifacts/draft-routes.json)"
+          else
+            echo "draft-routes.json для $SHA недоступен (нет push-прогона deploy или artifact удалён)"
+          fi
+
+      - name: Активация
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          SHA: ${{ inputs.sha }}
+        run: bash infra/deploy/ci-deploy.sh activate "$SHA"
+
+      - name: Смоук
+        env:
+          ENV_NAME: ${{ inputs.environment }}
+          ROUTES_ARGS: ${{ steps.routes.outputs.args }}
+          STAGING_BASIC_AUTH: ${{ secrets.STAGING_BASIC_AUTH }}
+        run: |
+          # shellcheck disable=SC2086 # ROUTES_ARGS — пусто или два слова без пробелов внутри
+          bash infra/deploy/smoke.sh "$ENV_NAME" $ROUTES_ARGS
+
+      - name: Итог
+        env:
+          ENV_NAME: ${{ inputs.environment }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          echo "Откат: $ENV_NAME → \`$SHA\`, смоук зелёный." >> "$GITHUB_STEP_SUMMARY"
