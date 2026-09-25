@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ровно по краю</title>
+<style>
+body { margin: 0; font-family: sans-serif; }
+.block { width: 360px; height: 40px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="block">360px</div>
+<span class="sr-only">Текст для экранного диктора, который шире одного пикселя</span>
+<p style="display: none; width: 900px;">Скрытый блок</p>
+<p style="visibility: hidden; width: 150px; overflow-x: hidden;">Невидимыйблоксобрезаннымдлиннымсловомбезпробелов</p>
+</body>
+</html>
