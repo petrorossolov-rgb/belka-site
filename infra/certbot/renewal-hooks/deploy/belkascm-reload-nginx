@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Deploy-hook certbot (T15): после выпуска или продления любого сертификата
+# nginx перечитывает конфигурацию и начинает отдавать новый сертификат.
+# Сервер: /etc/letsencrypt/renewal-hooks/deploy/belkascm-reload-nginx (root:root 0755).
+# certbot запускает все файлы каталога для каждого сертификата, включая соседские:
+# reload nginx им тоже нужен и ничего у них не меняет. При --dry-run не вызывается.
+set -euo pipefail
+export LC_ALL=C
+
+nginx -t -q
+systemctl reload nginx
