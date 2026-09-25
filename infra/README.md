@@ -23,6 +23,10 @@ IP сервера, имя соседнего сайта и ключи в реп�
 | `nginx/00-default.conf` | `/etc/nginx/sites-available/` + симлинк в `sites-enabled/` |
 | `nginx/belkascm.ru.conf` | то же |
 | `nginx/staging.belkascm.ru.conf` | то же |
+| `nginx/belkascm-maps.conf` | то же (контекст `http`: `map` для `Cache-Control`) |
+| `nginx/snippets/*.conf` | `/etc/nginx/snippets/belkascm/` |
+| `certbot/renewal-hooks/deploy/belkascm-reload-nginx` | `/etc/letsencrypt/renewal-hooks/deploy/` (`root:root 0755`) |
+| `monitor/check-site.sh` | на сервер не ставится: его запускает `.github/workflows/monitor.yml` |
 
 ## Пользователь и деплой (T12)
 
@@ -96,7 +100,7 @@ ssh -i <ключ окружения> deploy-belka@<сервер> "release 000000
   | `DEPLOY_HOST` | IP сервера |
   | `DEPLOY_SSH_KEY` | приватный ключ окружения |
   | `DEPLOY_KNOWN_HOSTS` | `ssh-keyscan -t ed25519 <сервер> \| grep -v '^#'` — одна строка, отпечаток (`ssh-keygen -lf`) сверен с известным |
-  | `STAGING_BASIC_AUTH` | заводится в T15 |
+  | `STAGING_BASIC_AUTH` | только `staging`: строка `user:pass` basic auth стейджинга (T15) |
 
 - Ротация ключа: новая пара → строка в `authorized_keys` → секрет → проверка
   выкладки → удаление старой строки.
@@ -152,3 +156,83 @@ Catch-all меняет поведение только для голого IP и
 Логи — `/var/log/nginx/belkascm*.log`; системный logrotate nginx хранит их 14 дней.
 
 Откат шага: удалить три симлинка из `sites-enabled`, `nginx -t`, `reload`.
+
+## TLS, HTTPS и стейджинг за паролем (T15)
+
+Сертификаты — certbot `--webroot` через ACME-каталог HTTP-блоков, поэтому их
+выпускают **до** установки HTTPS-версий конфигов: те ссылаются на файлы в
+`/etc/letsencrypt/live/`, без них `nginx -t` не пройдёт. A-записи всех трёх имён
+должны резолвиться на сервер, AAAA — не заводиться (у сервера нет IPv6, а
+Let's Encrypt предпочитает IPv6).
+
+```sh
+# Сначала пробный выпуск, затем настоящий. --account — prod-учётка ACME сервера
+# (ls /etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/).
+for dry in --dry-run ""; do
+  certbot certonly $dry --non-interactive --webroot -w /srv/belkascm/acme --account <id> \
+    --cert-name belkascm.ru -d belkascm.ru -d www.belkascm.ru
+  certbot certonly $dry --non-interactive --webroot -w /srv/belkascm/acme --account <id> \
+    --cert-name staging.belkascm.ru -d staging.belkascm.ru
+done
+```
+
+Пароль стейджинга генерируется вне репозитория, на сервер уходит только хеш
+(`apache2-utils` не ставится):
+
+```sh
+PASS=$(openssl rand -base64 18 | tr '+/' '-_')
+printf 'belka:%s\n' "$(openssl passwd -apr1 "$PASS")" > staging.htpasswd  # → сервер
+printf 'belka:%s' "$PASS" | gh secret set STAGING_BASIC_AUTH --env staging  # для смоука
+# Пароль — в менеджер паролей владельца; локальные файлы удалить.
+```
+
+Установка (под root, из временного каталога с копией `infra/`):
+
+```sh
+install -o root -g www-data -m 0640 staging.htpasswd /etc/nginx/belkascm-staging.htpasswd
+install -d -o root -g root -m 0755 /etc/nginx/snippets/belkascm
+install -o root -g root -m 0644 nginx/snippets/*.conf /etc/nginx/snippets/belkascm/
+for f in belkascm-maps.conf belkascm.ru.conf staging.belkascm.ru.conf; do
+  install -o root -g root -m 0644 "nginx/$f" "/etc/nginx/sites-available/$f"
+done
+ln -s /etc/nginx/sites-available/belkascm-maps.conf /etc/nginx/sites-enabled/belkascm-maps.conf
+install -o root -g root -m 0755 certbot/renewal-hooks/deploy/belkascm-reload-nginx \
+  /etc/letsencrypt/renewal-hooks/deploy/belkascm-reload-nginx
+nginx -t && systemctl reload nginx
+certbot renew --dry-run          # наши сертификаты — success
+systemctl is-active certbot.timer
+```
+
+Как устроены блоки:
+
+- HTTP (80) отвечает сам только на `/.well-known/acme-challenge/`, остальное —
+  301 на `https://belkascm.ru` (или `https://staging.belkascm.ru`) с путём.
+  `https://www.belkascm.ru/…` — 301 на apex с путём.
+- `listen 443 ssl http2` — параметр `http2` общий для адреса:порта, у соседнего
+  сайта он и так включён. Catch-all 443 (`00-default.conf`) отклоняет
+  рукопожатие с неизвестным SNI.
+- Все `add_header` — на уровне `server`, в наших `location` своих нет:
+  `add_header` в `location` отменил бы унаследованные заголовки безопасности.
+  `Cache-Control` выбирает `map` из `belkascm-maps.conf` (`/_astro/*` — год и
+  `immutable`, остальное — `no-cache`).
+- Стейджинг: `auth_basic` на весь server, `X-Robots-Tag: noindex, nofollow` с
+  `always` — и в ответах 401.
+- `error_page 404 /404.html` — страница из текущего релиза.
+- Deploy-hook certbot `belkascm-reload-nginx` перечитывает nginx после
+  продления любого сертификата. У соседнего сайта в том же каталоге свой hook —
+  двойной `reload` безвреден.
+
+Проверки:
+
+```sh
+curl -sI https://belkascm.ru/                        # 200, HSTS, CSP, nosniff, Referrer-Policy, Permissions-Policy
+curl -sI http://belkascm.ru/a?b                      # 301 → https://belkascm.ru/a?b
+curl -sI https://www.belkascm.ru/any/path/           # 301 → https://belkascm.ru/any/path/
+curl -sI https://staging.belkascm.ru/                # 401, X-Robots-Tag
+curl -sI -u "$STAGING_BASIC_AUTH" https://staging.belkascm.ru/   # 200, X-Robots-Tag
+curl -s https://belkascm.ru/nope                     # 404, тело — 404.html релиза
+```
+
+Откат шага: вернуть HTTP-версии `belkascm.ru.conf` и `staging.belkascm.ru.conf`
+из git (T13), удалить симлинк `belkascm-maps.conf`, `nginx -t`, `reload`.
+Сертификаты и htpasswd откат не мешают.
