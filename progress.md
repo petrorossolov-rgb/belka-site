@@ -25,14 +25,21 @@
 - **Merge PR на стороне GitHub подписывается почтой аккаунта** — при любом способе: merge-коммит и squash ставят её в автора, rebase — в коммитера. Локальный noreply-адрес на это не влияет. Поэтому у `petrorossolov-rgb` включено «Keep my email addresses private» (Settings → Emails; через API не задаётся, нужен скоуп `user`). С ним веб-операции подписываются noreply-адресом. PR мёржится `gh pr merge <N> --rebase`: в истории остаются коммиты задач без merge-коммитов. После каждого merge — `git log -3 --format='%h %ae %ce' origin/main`: только noreply-адреса. Если там появилась настоящая почта, значит, настройка слетела: остановиться и сообщить владельцу. (ep01 T23, исправлено в сессии F)
 - **Lighthouse CI**: `lighthouserc.{mobile,desktop}.cjs` строятся из `lhciConfig()` в `lighthouserc.base.cjs`; страницы — из sitemap прод-сборки плюс `/404.html` (`scripts/lhci-urls.mjs`), ручного списка нет. Запуск — `npm run lhci:mobile|lhci:desktop` на `dist/` прод-сборки. Локально на Windows `chrome-launcher` падает на уборке профиля (`EPERM`), поэтому отчёты смотрят в artifact `.lighthouseci` прогона CI. (ep01 T23)
 - **lychee 0.24**: `include_fragments` — строка (`"anchor-only"`), не `true`. `--root-dir` — абсолютный путь. В CI проверяется `dist/` (`lychee.toml`), документы — `npm run check:docs`. (ep01 T23)
+- **nginx belkascm: все `add_header` — на уровне `server`**, в наших `location` своих нет: `add_header` в `location` отменяет унаследованные заголовки безопасности. Различия по пути — через `map` в контексте `http` (`infra/nginx/belkascm-maps.conf`, пример — `$belkascm_cache_control`), заголовок — `add_header … $переменная always` в сниппете. Сниппеты — `/etc/nginx/snippets/belkascm/`. HTTPS-версии конфигов ссылаются на `/etc/letsencrypt/live/<имя>/`, поэтому сертификат выпускается (`certbot certonly --webroot`, сначала `--dry-run`) до их установки. (ep01 T15)
+- **Проверки с секретами не печатают команду**: `echo "### $*"` + `curl -u …` выводит пароль в журнал сессии. В таких проверках печатать только код ответа и заголовки. (ep01 T15)
+- **Скрипты-проверки для workflow — в `infra/<назначение>/*.sh`**, а не шагами YAML: их прогоняют локально (Git Bash) и проверяет shellcheck в `gates.yml` (новый скрипт — в список шага «shellcheck скриптов infra»). Пороги — переменные окружения с дефолтом (`MIN_DAYS=400 bash infra/monitor/check-site.sh`), код 1 — проверка не прошла, 2 — неверный вызов. (ep01 T19)
 
 ## Docs Debt
 <!-- Items logged by /my-execute, /my-change, /my-incident. Resolved by /my-sync-docs. -->
 
+- [ ] 2026-09-25 Update `docs/ep01-foundation/plan.md` → B6 и бриф T15 в `tasks.md` — `Permissions-Policy` без `interest-cohort` (FLoC снят, Chrome пишет ошибку в консоль — аудит Lighthouse); заголовки ставятся на уровне `server` с `map` для `Cache-Control`, а не сниппетом в каждой `location`. (ep01 T15)
 - [ ] 2026-09-24 Update `docs/ep01-foundation/plan.md` → «Контракт деплоя» — у `belka-deploy` сверх кодов 0/2/64 есть 65 (негодный архив: пустой, не tar.gz, без `index.html`, `..`, абсолютные пути, симлинки и жёсткие ссылки — запрещены все) и 1 (прочие сбои). Хранение — 5 последних по времени выкладки плюс текущий. Учесть в runbook `docs/runbooks/deploy.md` (T18). (ep01 T11)
 
 ## Follow-ups
 <!-- Tasks deferred from /my-incident or /my-change that need proper implementation later. -->
+
+- [ ] 2026-09-25 TTL зоны belkascm.ru в reg.ru — 86400, а не 300 (B2). Перед любой правкой зоны сначала снизить TTL до 300 и дождаться истечения старого; окончательное значение — в T25. (ep01 T14)
+- [ ] 2026-09-25 Сертификат соседнего сайта на VPS не продлевается: его A/AAAA указывают на хостинг reg.ru, `certbot renew --dry-run` по нему — failure (404 от чужого сервера). Истекает 2026-11-13. Решение владельца: вернуть DNS соседа на VPS или убрать его сертификат и vhost. Наши сертификаты от этого не зависят. (ep01 T15)
 
 - [ ] 2026-09-24 Когда владелец переедет на свой CI или хостинг git, вернуть код и документы в один приватный контур: lychee по `docs/` — снова шаг CI, снимок ДС можно оставить. Архив прежней истории — `C:\Proj\WMS\belka-site-history.git`. (ep01, разделение репозитория)
 
