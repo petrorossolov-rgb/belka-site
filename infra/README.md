@@ -27,6 +27,7 @@ IP сервера, имя соседнего сайта и ключи в реп�
 | `nginx/snippets/*.conf` | `/etc/nginx/snippets/belkascm/` |
 | `certbot/renewal-hooks/deploy/belkascm-reload-nginx` | `/etc/letsencrypt/renewal-hooks/deploy/` (`root:root 0755`) |
 | `monitor/check-site.sh` | на сервер не ставится: его запускает `.github/workflows/monitor.yml` |
+| `deploy/ci-deploy.sh`, `deploy/smoke.sh` | на сервер не ставятся: выкладка и смоук из `.github/workflows/deploy.yml` (и отката) |
 
 ## Пользователь и деплой (T12)
 
