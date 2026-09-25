@@ -4,16 +4,23 @@
 import Logo from '../components/Logo.astro';
 import Base from '../layouts/Base.astro';
 import { getSite, getVisible } from '../lib/content';
+import { buildTitle } from '../lib/seo';
 
 const site = await getSite();
 const page = (await getVisible('pages')).find((entry) => entry.id === 'index');
 if (page === undefined) {
   throw new Error('src/content/pages/index.md: нет видимой записи главной страницы');
 }
-const { title, description, draft, hero } = page.data;
+const { title, description, draft, hero, ogImage } = page.data;
 ---
 
-<Base title={title} description={description} draft={draft} brandScreen>
+<Base
+  title={buildTitle(title, site.name, { home: true })}
+  description={description}
+  draft={draft}
+  ogImage={ogImage}
+  brandScreen
+>
   <section class="container stub">
     {hero?.eyebrow && <p class="eyebrow">{hero.eyebrow}</p>}
     <h1 class="stub__title">
