@@ -1,0 +1,31 @@
+# Мониторинг доступности и срока TLS (T19, plan.md → Key Decision «Мониторинг»).
+# Каждые 3 часа и вручную. Любая неудача — failed run, GitHub уведомляет владельца
+# стандартным письмом о падении workflow. Сторонних сервисов и аккаунтов нет.
+# Scheduled workflows отключаются через 60 дней без коммитов в репозитории.
+name: monitor
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    name: monitor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: infra/monitor
+
+      - name: Доступность и срок сертификатов
+        run: bash infra/monitor/check-site.sh
