@@ -1,5 +1,8 @@
 # Гейты на каждый push (кроме main) и на каждый PR. Проверка PR —
 # required check `gates / gates-ok` для ветки main.
+# site_env: staging — как у deploy.yml: кроме полного production-набора (с
+# Lighthouse) проверяется и staging-сборка. Черновые секции есть только в ней,
+# и без этого их голос и раскладку гейт впервые увидел бы после мержа.
 name: ci
 
 on:
@@ -19,4 +22,4 @@ jobs:
   gates:
     uses: ./.github/workflows/gates.yml
     with:
-      site_env: production
+      site_env: staging
