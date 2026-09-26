@@ -8,6 +8,7 @@ import PlatformMap from '../components/home/PlatformMap.astro';
 import ProductCards from '../components/home/ProductCards.astro';
 import Section from '../components/home/Section.astro';
 import Steps from '../components/home/Steps.astro';
+import Surfaces from '../components/home/Surfaces.astro';
 import TermList from '../components/home/TermList.astro';
 import TextBlock from '../components/home/TextBlock.astro';
 import Base from '../layouts/Base.astro';
@@ -22,6 +23,7 @@ const VIEWS: Record<BlockView, (props: { block: Block }) => unknown> = {
   list: TermList,
   'platform-map': PlatformMap,
   products: ProductCards,
+  surfaces: Surfaces,
 };
 
 const site = await getSite();
