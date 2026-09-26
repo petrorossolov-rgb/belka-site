@@ -9,6 +9,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "build:favicons": "node scripts/build-favicons.mjs",
+    "build:og": "node scripts/build-og.mjs",
     "preview": "astro preview",
     "check": "astro check",
     "test": "vitest run",

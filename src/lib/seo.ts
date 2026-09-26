@@ -52,14 +52,39 @@ export function assetUrl(siteUrl: string, src: string): string {
   return new URL(src, `${origin(siteUrl)}/`).href;
 }
 
+/** Картинка превью в выводе: абсолютный URL, размеры файла и текстовая альтернатива. */
+export interface OgImage {
+  url: string;
+  width: number;
+  height: number;
+  alt: string;
+}
+
 export interface OpenGraphInput {
   title: string;
   description: string;
   siteName: string;
   /** Canonical страницы; у страниц без адреса (404) — нет. */
   url?: string | undefined;
-  /** Абсолютный URL картинки; только если задана (`page.ogImage` или `site.seo.defaultOgImage`). */
-  image?: string | undefined;
+  /** Картинка; только если задана (`page.ogImage` или `site.seo.defaultOgImage`). */
+  image?: OgImage | undefined;
+}
+
+/**
+ * Картинка превью и её alt — всегда из одной записи: своя картинка страницы со своим
+ * `ogImageAlt`, иначе картинка и alt сайта (`site.seo`). Схемы требуют alt у каждой
+ * картинки; нет alt — ошибка сборки, а не чужой alt.
+ */
+export function previewImage<I>(
+  page: { image?: I | undefined; alt?: string | undefined },
+  site: { image?: I | undefined; alt?: string | undefined },
+): { image: I; alt: string } | undefined {
+  const source = page.image !== undefined ? page : site;
+  if (source.image === undefined) return undefined;
+  if (source.alt === undefined) {
+    throw new Error(`у картинки превью ${source === page ? 'страницы' : 'сайта'} нет alt`);
+  }
+  return { image: source.image, alt: source.alt };
 }
 
 export interface MetaTag {
@@ -79,7 +104,14 @@ export function socialMeta({ title, description, siteName, url, image }: OpenGra
     og('title', title),
     og('description', description),
     ...(url === undefined ? [] : [og('url', url)]),
-    ...(image === undefined ? [] : [og('image', image)]),
+    ...(image === undefined
+      ? []
+      : [
+          og('image', image.url),
+          og('image:width', String(image.width)),
+          og('image:height', String(image.height)),
+          og('image:alt', image.alt),
+        ]),
     { attr: 'name', key: 'twitter:card', content: image === undefined ? 'summary' : 'summary_large_image' },
   ];
 }

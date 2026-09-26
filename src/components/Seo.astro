@@ -10,7 +10,7 @@ import { SITE_ENV } from 'astro:env/server';
 import mark from '../assets/brand/mark-rust.png';
 import { getSite } from '../lib/content';
 import { logoLayout, maxLogoHeight } from '../lib/logo';
-import { assetUrl, canonicalUrl, organizationJsonLd, serializeJsonLd, socialMeta } from '../lib/seo';
+import { assetUrl, canonicalUrl, organizationJsonLd, previewImage, serializeJsonLd, socialMeta } from '../lib/seo';
 import { indexable } from '../lib/site-env';
 
 interface Props {
@@ -21,18 +21,35 @@ interface Props {
   canonical?: boolean;
   /** Картинка превью; иначе `site.seo.defaultOgImage`, иначе без `og:image`. */
   ogImage?: ImageMetadata | undefined;
+  /** Alt своей картинки страницы (`page.ogImageAlt`); к картинке сайта идёт alt сайта. */
+  ogImageAlt?: string | undefined;
 }
 
-const { title, description, canonical = true, ogImage } = Astro.props;
+const { title, description, canonical = true, ogImage, ogImageAlt } = Astro.props;
 const site = await getSite();
 
 const url = canonical ? canonicalUrl(site.url, Astro.url.pathname) : undefined;
 
-const preview = ogImage ?? site.seo.defaultOgImage;
+// Картинка и alt — из одной записи (страницы или сайта). Размеры — исходного файла: getImage
+// не масштабирует, а check-dist-seo сверяет их с файлом в сборке и держит вес ≤ 300 КБ.
+// Перекодирование в PNG теряет палитру build:og (ep02 T13: 18 → 42 КБ) — запас большой, отдельной
+// ветки «PNG без перекодирования» не нужно; если карточка потяжелеет, гейт упадёт раньше прода.
+const preview = previewImage(
+  { image: ogImage, alt: ogImageAlt },
+  { image: site.seo.defaultOgImage, alt: site.seo.defaultOgImageAlt },
+);
 const image =
   preview === undefined
     ? undefined
-    : assetUrl(site.url, (await getImage({ src: preview, format: preview.format === 'jpg' ? 'jpg' : 'png' })).src);
+    : {
+        url: assetUrl(
+          site.url,
+          (await getImage({ src: preview.image, format: preview.image.format === 'jpg' ? 'jpg' : 'png' })).src,
+        ),
+        width: preview.image.width,
+        height: preview.image.height,
+        alt: preview.alt,
+      };
 
 const markSize = logoLayout('mark', maxLogoHeight('mark')).mark;
 const logo = await getImage({ src: mark, format: 'png', width: markSize?.width, height: markSize?.height });
