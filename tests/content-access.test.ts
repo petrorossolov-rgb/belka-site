@@ -2,7 +2,7 @@
 // Страницы берут из `astro:content` только `render`, `content.config.ts` — `defineCollection`
 // и `reference`; всё остальное — через функции `content.ts`. Тест заменяет ручной `grep`.
 
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -100,7 +100,8 @@ describe('проба: файл-нарушитель в копии дерева',
   /** Копия `src` с добавленным файлом; возвращает нарушения копии. */
   function withFile(file: string, content: string): string[] {
     copy = mkdtempSync(join(tmpdir(), 'content-access-'));
-    cpSync(SRC, copy, { recursive: true });
+    // Только каталоги и код: шрифты и картинки проверке не нужны, а копия всего src медленная.
+    cpSync(SRC, copy, { recursive: true, filter: (from) => statSync(from).isDirectory() || CODE_FILE.test(from) });
     mkdirSync(dirname(join(copy, file)), { recursive: true });
     writeFileSync(join(copy, file), content);
     return findContentAccessViolations(copy);
