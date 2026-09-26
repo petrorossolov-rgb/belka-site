@@ -8,7 +8,7 @@ export function product(id: string, data: Partial<ProductLike['data']> = {}, bod
     id,
     filePath: `src/content/products/${id}.md`,
     body,
-    data: { kind: 'platform', mapOrder: 1, hasPage: false, draft: false, ...data },
+    data: { name: `Belka ${id}`, kind: 'platform', mapOrder: 1, hasPage: false, draft: false, ...data },
   };
 }
 

@@ -16,6 +16,7 @@ import {
   visibleContacts,
   visibleLegal,
 } from '../src/lib/content-core';
+import { LIMITS } from '../src/lib/schemas';
 import {
   block,
   caseEntry,
@@ -493,6 +494,22 @@ describe('assertContentIntegrity: страница продукта, мокап�
     it('тело из одного непробельного символа — исключение; из одних пробелов — тела нет', () => {
       expect(check({ products: [pageProduct('wms', {}, '.')] })).toThrow(/wms\.md: у продукта со страницей \(hasPage\) тела нет/);
       expect(check({ products: [pageProduct('wms', {}, '  \n\n  ')] })).not.toThrow();
+    });
+
+    it('<title> «имя — пояснение» ровно titleMax проходит, +1 без seo.title падает, +1 с seo.title проходит', () => {
+      const prefix = 'Belka WMS — ';
+      const withDescriptor = (length: number, seo?: { title: string }) =>
+        pageProduct('wms', { name: 'Belka WMS', descriptor: 'я'.repeat(length - prefix.length), seo });
+      expect(check({ products: [withDescriptor(LIMITS.titleMax)] })).not.toThrow();
+      expect(check({ products: [withDescriptor(LIMITS.titleMax + 1)] })).toThrow(
+        /wms\.md: заголовок страницы «Belka WMS — я+» длиннее 60 символов — задайте seo\.title/,
+      );
+      expect(check({ products: [withDescriptor(LIMITS.titleMax + 1, { title: 'Belka WMS' })] })).not.toThrow();
+    });
+
+    it('длина заголовка у продукта без страницы не проверяется', () => {
+      const long = product('wms', { mapOrder: 1, descriptor: 'я'.repeat(LIMITS.titleMax) });
+      expect(check({ products: [long], blocks: [wmsScope] })).not.toThrow();
     });
 
     it('без hasPage descriptor, lead и секции не нужны', () => {

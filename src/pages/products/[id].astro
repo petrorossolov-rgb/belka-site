@@ -1,10 +1,12 @@
 ---
-// Минимальная страница продукта (ep01): имя, `short`, тело Markdown. Маршруты — только
-// продукты с `hasPage`, видимые в текущем окружении; черновая страница (`draft` продукта
-// или `pageDraft`) — с маркером и плашкой. Полный шаблон — ep03.
-import { render } from 'astro:content';
+// Страница продукта — полная или концепция, один шаблон: герой (`ProductHero`) и секции из
+// `product.sections` (общий рендер `Sections.astro`). Тела у продукта со страницей нет
+// (целостность контента). Маршруты — только продукты с `hasPage`, видимые в текущем
+// окружении; черновая страница (`draft` продукта или `pageDraft`) — с маркером и плашкой.
+import ProductHero from '../../components/product/ProductHero.astro';
+import Sections from '../../components/sections/Sections.astro';
 import Base from '../../layouts/Base.astro';
-import { getProductPages, getSite, type Product } from '../../lib/content';
+import { getProductPages, getProductSections, getSite, type Product } from '../../lib/content';
 import { buildTitle, productTitle } from '../../lib/seo';
 
 export async function getStaticPaths() {
@@ -18,26 +20,17 @@ interface Props {
 
 const { product } = Astro.props;
 const site = await getSite();
-const { Content } = await render(product);
-const { name, short, summary, seo, draft, pageDraft } = product.data;
+const sections = await getProductSections(product);
+const { summary, seo, draft, pageDraft, ogImage, ogImageAlt } = product.data;
 ---
 
-<Base title={buildTitle(productTitle(product.data), site.name)} description={seo?.description ?? summary} draft={draft || pageDraft}>
-  <article class="container product">
-    <p class="eyebrow">{short}</p>
-    <h1>{name}</h1>
-    <Content />
-  </article>
+<Base
+  title={buildTitle(productTitle(product.data), site.name)}
+  description={seo?.description ?? summary}
+  draft={draft || pageDraft}
+  ogImage={ogImage}
+  ogImageAlt={ogImageAlt}
+>
+  <ProductHero product={product} />
+  <Sections blocks={sections} />
 </Base>
-
-<style>
-  .product {
-    display: grid;
-    gap: var(--space-md);
-    padding-block: var(--space-section);
-  }
-
-  .product > :global(*) {
-    max-width: var(--measure);
-  }
-</style>

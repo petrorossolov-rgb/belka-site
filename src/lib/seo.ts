@@ -28,9 +28,17 @@ export function buildTitle(title: string, siteName: string, { home = false }: { 
   return home ? title : `${title}${TITLE_SEPARATOR}${siteName}`;
 }
 
-/** Заголовок страницы продукта до суффикса: `seo.title` или имя продукта. */
-export function productTitle(product: { name: string; seo?: { title?: string | undefined } | undefined }): string {
-  return product.seo?.title ?? product.name;
+/**
+ * Заголовок страницы продукта до суффикса: `seo.title`, иначе «имя — пояснение» (латинское имя
+ * с русским пояснением, Constitution 3), без пояснения — имя. Длину держит целостность контента.
+ */
+export function productTitle(product: {
+  name: string;
+  descriptor?: string | undefined;
+  seo?: { title?: string | undefined } | undefined;
+}): string {
+  if (product.seo?.title !== undefined) return product.seo.title;
+  return product.descriptor === undefined ? product.name : `${product.name}${TITLE_SEPARATOR}${product.descriptor}`;
 }
 
 function origin(siteUrl: string): string {

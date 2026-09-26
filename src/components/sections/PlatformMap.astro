@@ -1,7 +1,8 @@
 ---
 // Вид `platform-map`: продукты платформы по `mapOrder` — имя и `summary`; сетка 1 / 2 / 4
 // колонки (токены `--map-columns-*`). Ссылка — только на собранную страницу продукта
-// (`isLinkable`): черновая страница в production не собирается, и ссылки на неё нет.
+// (`isLinkable`): черновая страница в production не собирается, и ссылки на неё нет. На странице
+// самого продукта ссылка на неё остаётся, но с `aria-current="page"`, как пункт меню в шапке.
 import ProductName from '../ProductName.astro';
 import { isLinkable, productHref } from '../../lib/content-core';
 import { getPlatformMap, getProductPages, type Block } from '../../lib/content';
@@ -12,6 +13,7 @@ interface Props {
 
 const products = await getPlatformMap();
 const pages = await getProductPages();
+const current = Astro.url.pathname;
 ---
 
 <ul class="platform-map" role="list">
@@ -20,7 +22,7 @@ const pages = await getProductPages();
       <li class="platform-map__item">
         <h3 class="platform-map__name">
           {isLinkable(product, pages) ? (
-            <a href={productHref(product.id)}>
+            <a href={productHref(product.id)} aria-current={productHref(product.id) === current ? 'page' : undefined}>
               <ProductName name={product.data.name} />
             </a>
           ) : (
