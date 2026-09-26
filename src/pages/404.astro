@@ -1,22 +1,22 @@
 ---
 // Выход из тупика. Сборка кладёт страницу в dist/404.html, nginx отдаёт её через error_page (T15).
-// Текст утверждён владельцем 2026-09-24 (гейт A); финальная 404 — ep02.
+// Текст — `pages/404.md`: `title` — в `<title>`, `hero.heading` — заголовок, ссылка — в теле.
+import { render } from 'astro:content';
 import Base from '../layouts/Base.astro';
-import { getSite } from '../lib/content';
+import { getPage, getSite } from '../lib/content';
 import { buildTitle } from '../lib/seo';
 
 const site = await getSite();
+const page = await getPage('404');
+const { Content } = await render(page);
+const { title, description, hero } = page.data;
 ---
 
-<Base
-  title={buildTitle('Страница не найдена', site.name)}
-  description="Такой страницы нет: возможно, адрес набран с ошибкой или страница ещё не опубликована."
-  canonical={false}
->
+<Base title={buildTitle(title, site.name)} description={description} canonical={false}>
   <section class="container not-found">
-    <h1>Такой страницы нет</h1>
-    <p>Возможно, адрес набран с ошибкой или страница ещё не опубликована.</p>
-    <p><a href="/">На главную</a></p>
+    <h1>{hero?.heading ?? title}</h1>
+    {hero?.lead && <p>{hero.lead}</p>}
+    <Content />
   </section>
 </Base>
 
@@ -28,7 +28,7 @@ const site = await getSite();
     padding-block: var(--space-section);
   }
 
-  .not-found > * {
+  .not-found > :global(*) {
     max-width: var(--measure);
   }
 </style>
