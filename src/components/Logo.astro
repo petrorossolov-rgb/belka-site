@@ -2,7 +2,8 @@
 // Единственная точка вывода знака Belka SCM (Constitution 3). Растры не перекрашиваются
 // и не обрезаются; замена на SVG, когда он появится, — правка только этого файла.
 import { Picture } from 'astro:assets';
-import mark from '../assets/brand/mark-rust.png';
+import markMilk from '../assets/brand/mark-milk.png';
+import markRust from '../assets/brand/mark-rust.png';
 import wordmarkBark from '../assets/brand/wordmark-latin-bark.png';
 import wordmarkMilk from '../assets/brand/wordmark-latin-milk.png';
 import wordmarkRust from '../assets/brand/wordmark-latin-rust.png';
@@ -17,16 +18,21 @@ type Common = {
   size: number;
   /** Цвет словесного знака: кора на светлом, молоко на тёмном и рыжем. */
   tone?: 'bark' | 'milk' | 'rust';
+  /** Цвет знака: рыжий на светлом, молочный на плашке (кора или рыжий). */
+  markTone?: 'rust' | 'milk';
+  /** Знак — крупнейший элемент первого экрана (LCP): `fetchpriority="high"`. */
+  priority?: boolean;
   class?: string;
 };
 
 // Либо текстовая альтернатива, либо явная пометка, что рядом уже есть имя.
 type Props = Common & ({ alt: string; decorative?: never } | { decorative: true; alt?: never });
 
-const { variant = 'lockup', size, tone = 'bark', class: className } = Astro.props;
+const { variant = 'lockup', size, tone = 'bark', markTone = 'rust', priority = false, class: className } = Astro.props;
 const alt = Astro.props.decorative ? '' : Astro.props.alt;
 const hidden = Astro.props.decorative ? 'true' : undefined;
 const layout = logoLayout(variant, size);
+const mark = { milk: markMilk, rust: markRust }[markTone];
 const wordmark = { bark: wordmarkBark, milk: wordmarkMilk, rust: wordmarkRust }[tone];
 const formats: Array<'avif' | 'webp'> = ['avif', 'webp'];
 const densities = [1, 2];
@@ -47,6 +53,7 @@ const densities = [1, 2];
         alt={alt ?? ''}
         aria-hidden={hidden}
         loading="eager"
+        fetchpriority={priority ? 'high' : undefined}
       />
     )
   }

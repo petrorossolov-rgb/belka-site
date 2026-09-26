@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DS_TOKEN_FILES, parseTokens, snapshotTokens, type TokenMap } from './fixtures/ds-sources';
 
@@ -77,6 +77,90 @@ describe('контраст темы (WCAG AA)', () => {
   it('bark-400 не используется ни одним токеном темы', () => {
     const themeCss = readFileSync(new URL('theme.css', STYLES), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(themeCss).not.toMatch(/--bk-bark-400/);
+  });
+});
+
+describe('плашка героя: оба варианта маппинга', () => {
+  const PLATE_VARIANTS = ['bark', 'rust'] as const;
+  type PlateVariant = (typeof PLATE_VARIANTS)[number];
+  const pair = (variant: PlateVariant, fg: 'on' | 'muted') =>
+    contrast(resolveColor(theme, `--plate-${variant}-${fg}`), resolveColor(theme, `--plate-${variant}-bg`));
+
+  // Оба варианта проверяются независимо от того, какой включён: переключение — правка маппинга.
+  it.each(['on', 'muted'] as const)('кора: --plate-bark-%s на --plate-bark-bg ≥ 4.5 — любой текст', (fg) => {
+    expect(pair('bark', fg)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(['on', 'muted'] as const)('рыжий: --plate-rust-%s на --plate-rust-bg ≥ 3.0 — крупный текст', (fg) => {
+    expect(pair('rust', fg)).toBeGreaterThanOrEqual(3.0);
+  });
+
+  it('рыжий — рыжий бренда #C4552A, знак на нём молочный', () => {
+    expect(resolveColor(theme, '--plate-rust-bg').toUpperCase()).toBe('#C4552A');
+    expect(resolveColor(theme, '--plate-rust-on')).toBe(resolveColor(theme, '--bk-milk-50'));
+  });
+
+  /** Включённый вариант: все три токена `--color-plate-*` указывают на один вариант. */
+  function activePlate(tokens: TokenMap): PlateVariant {
+    const variants = ['bg', 'on', 'muted'].map((part) => {
+      const name = part === 'on' ? '--color-on-plate' : `--color-plate-${part}`;
+      return new RegExp(`^var\\(--plate-(\\w+)-${part}\\)$`).exec(tokens.get(name) ?? '')?.[1];
+    });
+    const [first] = variants;
+    if (!PLATE_VARIANTS.includes(first as PlateVariant) || variants.some((v) => v !== first)) {
+      throw new Error(`маппинг плашки смешивает варианты или ссылается мимо них: ${variants.join(', ')}`);
+    }
+    return first as PlateVariant;
+  }
+
+  it('маппинг --color-plate-* указывает на один вариант целиком', () => {
+    expect(PLATE_VARIANTS).toContain(activePlate(theme));
+    const mixed = parseTokens(
+      ':root { --color-plate-bg: var(--plate-rust-bg); --color-on-plate: var(--plate-bark-on); --color-plate-muted: var(--plate-rust-muted); }',
+    );
+    expect(() => activePlate(mixed)).toThrow(/смешивает/);
+  });
+
+  // Крупный текст WCAG: от 24px или от 18.66px жирным. На 360px h2 — 26px, h3 — 20px.
+  const LARGE_SIZES = ['--text-display', '--text-h1', '--text-h2'];
+  const LARGE_IF_BOLD = ['--text-h3'];
+  const BOLD = /font-weight\s*:\s*var\(--font-weight-(bold|heavy)\)/;
+
+  /** Объявления `font-size` в `<style>` героя, которые дают мелкий текст на плашке. */
+  function smallTextOnPlate(astro: string): string[] {
+    const styles = [...astro.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]!).join('\n');
+    const small: string[] = [];
+    for (const [, selector, body] of styles.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      for (const [, value] of body!.matchAll(/font-size\s*:\s*([^;]+);?/g)) {
+        const token = /^var\((--[\w-]+)\)$/.exec(value!.trim())?.[1] ?? '';
+        const large = LARGE_SIZES.includes(token) || (LARGE_IF_BOLD.includes(token) && BOLD.test(body!));
+        if (!large) small.push(`${selector!.trim()}: font-size ${value!.trim()}`);
+      }
+    }
+    return small;
+  }
+
+  it('соглашение: при рыжей плашке в герое нет мелкого текста', () => {
+    const hero = new URL('../src/components/home/Hero.astro', import.meta.url);
+    // Героя до T11 нет — на странице нет и текста на плашке.
+    if (activePlate(theme) !== 'rust' || !existsSync(hero)) return;
+    expect(smallTextOnPlate(readFileSync(hero, 'utf8'))).toEqual([]);
+  });
+
+  it('проба соглашения: мелкие кегли находятся, крупные — нет', () => {
+    const astro = `<p>x</p><style>
+      .a { font-size: var(--text-small); }
+      .b { font-size: var(--text-h2); }
+      .c { font-size: var(--text-h3); font-weight: var(--font-weight-bold); }
+      .d { font-size: var(--text-h3); }
+      .e { color: var(--color-on-plate); font-size: 1rem; }
+      /* .f { font-size: var(--text-eyebrow); } */
+    </style>`;
+    expect(smallTextOnPlate(astro)).toEqual([
+      '.a: font-size var(--text-small)',
+      '.d: font-size var(--text-h3)',
+      '.e: font-size 1rem',
+    ]);
   });
 });
 
