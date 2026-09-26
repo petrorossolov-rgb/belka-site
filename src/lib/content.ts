@@ -8,6 +8,7 @@ import * as core from './content-core';
 import type { NavItem, NavPlacement } from './content-core';
 
 export type { NavItem, NavPlacement };
+export { RESERVED_PAGE_IDS } from './content-core';
 
 type VisibleCollection = 'products' | 'pages' | 'cases';
 
