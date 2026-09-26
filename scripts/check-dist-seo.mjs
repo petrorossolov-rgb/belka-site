@@ -99,9 +99,17 @@ function srcsetUrls(/** @type {string} */ srcset) {
   return srcset.split(',').map((part) => part.trim().split(/\s+/)[0] ?? '').filter(Boolean);
 }
 
-/** Все `url(...)` в CSS. */
+/** Все `url(...)` в CSS и строковые `@import "…"` (Stylelint требует именно эту форму). */
 function cssUrls(/** @type {string} */ css) {
-  return [...css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '');
+  return [
+    ...[...css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? ''),
+    ...[...css.matchAll(/@import\s+(?:"([^"]*)"|'([^']*)')/gi)].map((m) => m[1] ?? m[2] ?? ''),
+  ];
+}
+
+/** Кавычки в значении атрибута `style` могут прийти сущностями. */
+function decodeQuotes(/** @type {string} */ value) {
+  return value.replace(/&quot;|&#34;|&#x22;/gi, '"').replace(/&#39;|&#x27;|&apos;/gi, "'");
 }
 
 function inlineStyles(/** @type {string} */ html) {
@@ -204,7 +212,7 @@ function checkPageInvariants(/** @type {string} */ file, /** @type {string} */ h
   };
 
   const fontFiles = primaryFontFiles(html);
-  for (const tag of parseTags(html, ['link', 'script', 'img', 'source', 'video', 'audio', 'iframe'])) {
+  for (const tag of parseTags(html, ['link', 'script', 'img', 'source', 'video', 'audio', 'iframe', 'track', 'input', 'embed', 'object', 'image'])) {
     const { name, attrs } = tag;
     if (name === 'link') {
       const rels = (attrs.get('rel') ?? '').toLowerCase().split(/\s+/);
@@ -220,6 +228,15 @@ function checkPageInvariants(/** @type {string} */ file, /** @type {string} */ h
     } else if (name === 'script') {
       if ((attrs.get('type') ?? '').toLowerCase() !== 'application/ld+json') {
         errors.push(`${file}: <script${attrs.has('src') ? ` src="${attrs.get('src')}"` : ''}> — клиентский JS запрещён`);
+      } else if (attrs.has('src')) {
+        external('<script src>', attrs.get('src') ?? '');
+      }
+    } else if (name === 'object') {
+      if (attrs.has('data')) external('<object data>', attrs.get('data') ?? '');
+    } else if (name === 'image') {
+      // SVG <image>: href или устаревший xlink:href.
+      for (const attr of ['href', 'xlink:href']) {
+        if (attrs.has(attr)) external(`<image ${attr}>`, attrs.get(attr) ?? '');
       }
     } else {
       for (const attr of ['src', 'poster']) {
@@ -230,6 +247,9 @@ function checkPageInvariants(/** @type {string} */ file, /** @type {string} */ h
   }
   for (const css of inlineStyles(html)) {
     for (const url of cssUrls(css)) external('url() во встроенном стиле', url);
+  }
+  for (const tag of tagsWithAttr(html, 'style')) {
+    for (const url of cssUrls(decodeQuotes(tag.attrs.get('style') ?? ''))) external(`url() в style у <${tag.name}>`, url);
   }
   return errors;
 }
