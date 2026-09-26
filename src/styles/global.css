@@ -29,6 +29,7 @@ body {
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 img,
