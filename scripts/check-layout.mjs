@@ -1,5 +1,6 @@
 // @ts-check
-// Гейт адаптива (ep02 T03): ни одна страница сборки не шире окна на 360 / 768 / 1440.
+// Гейт адаптива (ep02 T03): ни одна страница сборки не шире окна на 360 / 768 / 1440 и ничего не
+// уходит за его левый или правый край.
 //
 //   node scripts/check-layout.mjs --dist <dir> [--widths 360,768,1440]
 //
@@ -19,6 +20,7 @@ import { startStaticServer } from './lib/static-server.mjs';
  * @typedef {object} Rect измерение элемента `body *` в CSS px
  * @property {string} selector короткий CSS-путь для вывода
  * @property {number} parent индекс родителя в rects, -1 — body
+ * @property {number} left левая граница бокса (getBoundingClientRect)
  * @property {number} right правая граница бокса (getBoundingClientRect)
  * @property {number} width
  * @property {number} height
@@ -43,10 +45,11 @@ const px = (/** @type {number} */ n) => `${Math.round(n * 100) / 100}px`;
 
 /**
  * Переполнение на одной странице и ширине. Нарушение — любое из:
- * документ шире окна; правая граница видимого элемента за окном; содержимое видимого элемента
- * шире его бокса (scrollWidth > clientWidth: длинное слово, обрезка под overflow: hidden|clip).
+ * документ шире окна; левая или правая граница видимого элемента за окном (за левый край прокрутки
+ * нет, контент просто теряется); содержимое видимого элемента шире его бокса (scrollWidth >
+ * clientWidth: длинное слово, обрезка под overflow: hidden|clip).
  * Исключение — только потомки контейнера overflow-x: auto|scroll, который сам умещается в окно
- * (правило правой границы), и сам такой контейнер (правило содержимого). Невидимые элементы —
+ * (правила границ), и сам такой контейнер (правило содержимого). Невидимые элементы —
  * display: none, visibility: hidden, нулевой размер, visually-hidden (≤ 1×1 с обрезкой) и его
  * потомки — не проверяются.
  * @param {Measure} measure
@@ -73,9 +76,13 @@ export function findOverflow({ viewport, scrollWidth, rects }) {
     if (r.hidden || inSrOnly[i] || r.width <= 0 || r.height <= 0) return;
     const s = scroller[i] ?? -1;
     const scrollerRect = s >= 0 ? rects[s] : undefined;
-    const insideFittingScroller = scrollerRect !== undefined && scrollerRect.right <= viewport + EPSILON;
+    const insideFittingScroller = scrollerRect !== undefined
+      && scrollerRect.left >= -EPSILON && scrollerRect.right <= viewport + EPSILON;
     if (r.right > viewport + EPSILON && !insideFittingScroller) {
       found.push({ selector: r.selector, reason: `правая граница ${px(r.right)} за окном ${px(viewport)}` });
+    }
+    if (r.left < -EPSILON && !insideFittingScroller) {
+      found.push({ selector: r.selector, reason: `левая граница ${px(r.left)} за левым краем окна` });
     }
     if (!SCROLLERS.includes(r.overflowX) && r.scrollWidth > r.clientWidth) {
       const how = r.overflowX === 'visible' ? 'вылезает' : `обрезано (overflow-x: ${r.overflowX})`;
@@ -119,6 +126,7 @@ function collect() {
     return {
       selector: describe(el),
       parent: el.parentElement ? (index.get(el.parentElement) ?? -1) : -1,
+      left: box.left,
       right: box.right,
       width: box.width,
       height: box.height,
