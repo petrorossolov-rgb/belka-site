@@ -1,0 +1,51 @@
+---
+// Герой страницы продукта (полной и концепции): `short` — надзаголовок, `h1` — имя продукта с
+// русским пояснением («Belka WMS — система управления складом», Constitution 3), `lead`.
+// Пояснение и лид у продукта со страницей обязательны (целостность контента).
+import ProductName from '../ProductName.astro';
+import type { Product } from '../../lib/content';
+import { TITLE_SEPARATOR } from '../../lib/seo';
+
+interface Props {
+  product: Product;
+}
+
+const { name, short, descriptor, lead } = Astro.props.product.data;
+---
+
+<header class="container product-hero">
+  <p class="eyebrow">{short}</p>
+  <h1 class="product-hero__title">
+    <ProductName name={name} />{
+      // Разделитель — выражением: пробел между компонентом и текстом Astro при сборке схлопывает.
+      descriptor && <span class="product-hero__descriptor">{`${TITLE_SEPARATOR}${descriptor}`}</span>
+    }
+  </h1>
+  {lead && <p class="product-hero__lead">{lead}</p>}
+</header>
+
+<style>
+  .product-hero {
+    display: grid;
+    gap: var(--space-md);
+    justify-items: start;
+    padding-block: var(--space-section);
+  }
+
+  .product-hero > * {
+    max-width: var(--measure);
+  }
+
+  .product-hero__title {
+    hyphens: auto;
+  }
+
+  .product-hero__descriptor {
+    font-weight: var(--font-weight-regular);
+  }
+
+  .product-hero__lead {
+    font-size: var(--text-h3);
+    line-height: var(--leading-snug);
+  }
+</style>

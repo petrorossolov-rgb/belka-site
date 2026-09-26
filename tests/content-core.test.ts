@@ -16,7 +16,21 @@ import {
   visibleContacts,
   visibleLegal,
 } from '../src/lib/content-core';
-import { block, caseEntry, ep01Products, page, product, refs, standalone } from './fixtures/content';
+import { LIMITS } from '../src/lib/schemas';
+import {
+  block,
+  caseEntry,
+  ep01Products,
+  mockup,
+  og,
+  page,
+  pageProduct,
+  product,
+  refs,
+  standalone,
+  surface,
+  wmsScope,
+} from './fixtures/content';
 
 const ids = (entries: readonly { id: string }[]) => entries.map((e) => e.id);
 
@@ -143,7 +157,8 @@ describe('assertContentIntegrity', () => {
     products: ep01Products,
     pages: [page('index'), page('legal/privacy')],
     cases: [],
-    blocks: [],
+    blocks: [wmsScope],
+    mockups: [],
     site: {},
   };
 
@@ -152,7 +167,7 @@ describe('assertContentIntegrity', () => {
   });
 
   it('пустые коллекции — без исключений', () => {
-    expect(() => assertContentIntegrity({ products: [], pages: [], cases: [], blocks: [], site: {} })).not.toThrow();
+    expect(() => assertContentIntegrity({ products: [], pages: [], cases: [], blocks: [], mockups: [], site: {} })).not.toThrow();
   });
 
   it('дубль mapOrder — исключение с именами обоих файлов', () => {
@@ -179,16 +194,9 @@ describe('assertContentIntegrity', () => {
     expect(() => assertContentIntegrity({ ...valid, cases })).toThrow(/Big-client/);
   });
 
-  it('hasPage с пустым телом — исключение', () => {
-    for (const body of ['', '  \n\n  ']) {
-      const products = [product('wms', { hasPage: true }, body)];
-      expect(() => assertContentIntegrity({ ...valid, products })).toThrow(/wms\.md: hasPage: true/);
-    }
-  });
-
-  it('пустое тело без hasPage допустимо', () => {
+  it('тело без hasPage допустимо — служебная заглушка продукта без страницы', () => {
     expect(() => assertContentIntegrity({ ...valid, products: [standalone('packapp', {})] })).not.toThrow();
-    const products = [product('yms', {}, '')];
+    const products = [product('yms', {}, 'Заглушка ep01.')];
     expect(() => assertContentIntegrity({ ...valid, products })).not.toThrow();
   });
 
@@ -218,7 +226,7 @@ describe('assertContentIntegrity', () => {
     }
     expect(message).toMatch(/не соответствует формату/);
     expect(message).toMatch(/mapOrder 1 повторяется/);
-    expect(message).toMatch(/hasPage: true/);
+    expect(message).toMatch(/yms\.md: у продукта со страницей \(hasPage\) нужны descriptor, lead, sections/);
   });
 });
 
@@ -340,10 +348,12 @@ describe('assertContentIntegrity: секции, маршруты, контакт
     pages: [home('theses', 'team')],
     cases: [],
     blocks: [theses, team],
+    mockups: [],
     site: {},
   };
+  // Секция страницы WMS из набора ep01 (`pageProduct`) есть при любой подмене блоков.
   const check = (patch: Partial<Parameters<typeof assertContentIntegrity>[0]>) => () =>
-    assertContentIntegrity({ ...base, ...patch });
+    assertContentIntegrity({ ...base, ...patch, blocks: [...(patch.blocks ?? base.blocks), wmsScope] });
 
   it('набор с секциями — без исключений', () => {
     expect(check({})).not.toThrow();
@@ -406,6 +416,9 @@ describe('assertContentIntegrity: секции, маршруты, контакт
       /products\/wms\.md: id «products\/wms» занимает маршрут страниц продуктов/,
     );
     expect(check({ pages: [...base.pages, page('products-overview')] })).not.toThrow();
+    // Хаб /products/ (ep03) — страница `products`: маршрут `[...slug]`, не `products/[id]`.
+    expect(check({ pages: [...base.pages, page('products')] })).not.toThrow();
+    expect(check({ pages: [...base.pages, page('products/x')] })).toThrow(/products\/x\.md: id «products\/x» занимает маршрут/);
   });
 
   it('6: у 404 нет nav, sections и draft', () => {
@@ -440,6 +453,233 @@ describe('assertContentIntegrity: секции, маршруты, контакт
 
   it('8: черновой блок на видимой странице допустим', () => {
     expect(check({ blocks: [block('theses', { draft: true }), team] })).not.toThrow();
+  });
+});
+
+describe('assertContentIntegrity: страница продукта, мокапы, OG (ep03)', () => {
+  const wmsSurfaces = block('wms-surfaces', { view: 'surfaces', items: [surface('wms-console', 'wms')] });
+  const wms = pageProduct('wms', { sections: refs('wms-scope', 'wms-surfaces') });
+  const base = {
+    products: [wms, product('analytics', { mapOrder: 6 })],
+    pages: [page('index')],
+    cases: [],
+    blocks: [wmsScope, wmsSurfaces],
+    mockups: [mockup('wms-console')],
+    site: { mockupNote: 'Демо-данные.' },
+  };
+  const check = (patch: Partial<Parameters<typeof assertContentIntegrity>[0]>) => () =>
+    assertContentIntegrity({ ...base, ...patch });
+
+  it('набор с поверхностями, мокапом и подписью — без исключений', () => {
+    expect(check({})).not.toThrow();
+  });
+
+  it('концепт-продукт: hasPage, descriptor, lead, секции text и cards, без surfaces и мокапов', () => {
+    const concept = pageProduct('portal', { mapOrder: 2, sections: refs('portal-about', 'portal-fit') });
+    const blocks = [block('portal-about', { view: 'text' }, 'Текст концепции.'), block('portal-fit')];
+    expect(check({ products: [concept], blocks, mockups: [], site: {} })).not.toThrow();
+  });
+
+  describe('1: у продукта со страницей — descriptor, lead и секции, тела нет', () => {
+    it.each(['descriptor', 'lead'] as const)('нет %s — исключение', (field) => {
+      expect(check({ products: [pageProduct('wms', { [field]: undefined })] })).toThrow(
+        new RegExp(`wms\\.md: у продукта со страницей \\(hasPage\\) нужны ${field}$`, 'm'),
+      );
+    });
+
+    it('нет секций — исключение, и на черновой странице тоже', () => {
+      expect(check({ products: [pageProduct('wms', { sections: [] })] })).toThrow(/нужны sections/);
+      expect(check({ products: [pageProduct('wms', { sections: undefined, pageDraft: true })] })).toThrow(
+        /нужны sections/,
+      );
+    });
+
+    it('тело из одного непробельного символа — исключение; из одних пробелов — тела нет', () => {
+      expect(check({ products: [pageProduct('wms', {}, '.')] })).toThrow(/wms\.md: у продукта со страницей \(hasPage\) тела нет/);
+      expect(check({ products: [pageProduct('wms', {}, '  \n\n  ')] })).not.toThrow();
+    });
+
+    it('<title> «имя — пояснение» ровно titleMax проходит, +1 без seo.title падает, +1 с seo.title проходит', () => {
+      const prefix = 'Belka WMS — ';
+      const withDescriptor = (length: number, seo?: { title: string }) =>
+        pageProduct('wms', { name: 'Belka WMS', descriptor: 'я'.repeat(length - prefix.length), seo });
+      expect(check({ products: [withDescriptor(LIMITS.titleMax)] })).not.toThrow();
+      expect(check({ products: [withDescriptor(LIMITS.titleMax + 1)] })).toThrow(
+        /wms\.md: заголовок страницы «Belka WMS — я+» длиннее 60 символов — задайте seo\.title/,
+      );
+      expect(check({ products: [withDescriptor(LIMITS.titleMax + 1, { title: 'Belka WMS' })] })).not.toThrow();
+    });
+
+    it('длина заголовка у продукта без страницы не проверяется', () => {
+      const long = product('wms', { mapOrder: 1, descriptor: 'я'.repeat(LIMITS.titleMax) });
+      expect(check({ products: [long], blocks: [wmsScope] })).not.toThrow();
+    });
+
+    it('без hasPage descriptor, lead и секции не нужны', () => {
+      // Без блока поверхностей: пункт `surfaces` требует descriptor у продукта (правило 3).
+      expect(check({ products: [product('wms', { mapOrder: 1 }, 'Заглушка ep01.')], blocks: [wmsScope] })).not.toThrow();
+    });
+  });
+
+  describe('2: секции продукта — существующие блоки без повторов', () => {
+    it('несуществующий блок — исключение', () => {
+      expect(check({ products: [pageProduct('wms', { sections: refs('wms-scope', 'nope') })] })).toThrow(
+        /wms\.md: секция «nope» не найдена в src\/content\/blocks/,
+      );
+    });
+
+    it('повтор блока — исключение; тот же блок у страницы и у продукта — допустим', () => {
+      expect(check({ products: [pageProduct('wms', { sections: refs('wms-scope', 'wms-scope') })] })).toThrow(
+        /wms\.md: секция «wms-scope» повторяется/,
+      );
+      expect(check({ pages: [page('index', { sections: refs('wms-scope') })] })).not.toThrow();
+    });
+  });
+
+  describe('3: пункт surfaces — мокап и продукт существуют, продукт с descriptor и не черновик', () => {
+    const surfaces = (items: ReturnType<typeof surface>[], draft = false) =>
+      block('wms-surfaces', { view: 'surfaces', items, draft });
+
+    it('несуществующий мокап — исключение', () => {
+      expect(check({ blocks: [wmsScope, surfaces([surface('nope', 'wms')])] })).toThrow(
+        /wms-surfaces\.md: пункт 1 — мокап «nope» не найден в src\/content\/mockups/,
+      );
+    });
+
+    it('несуществующий продукт — исключение', () => {
+      expect(check({ blocks: [wmsScope, surfaces([surface('wms-console', 'nope')])] })).toThrow(
+        /wms-surfaces\.md: пункт 1 — продукт «nope» не найден/,
+      );
+    });
+
+    it('продукт без descriptor — исключение; с descriptor — допустим', () => {
+      const blocks = [wmsScope, surfaces([surface('wms-console', 'wms'), surface('wms-console-2', 'analytics')])];
+      const mockups = [mockup('wms-console'), mockup('wms-console-2', 'dashboard')];
+      expect(check({ blocks, mockups })).toThrow(
+        /wms-surfaces\.md: пункт 2 — у продукта src\/content\/products\/analytics\.md нет descriptor/,
+      );
+      const analytics = product('analytics', { mapOrder: 6, descriptor: 'пояснение имени' });
+      expect(check({ blocks, mockups, products: [wms, analytics] })).not.toThrow();
+    });
+
+    it('нечерновой блок с черновым продуктом — исключение; черновой блок — допустим', () => {
+      const analytics = product('analytics', { mapOrder: 6, descriptor: 'пояснение имени', draft: true });
+      const items = [surface('wms-console', 'analytics')];
+      const products = [wms, analytics];
+      expect(check({ products, blocks: [wmsScope, surfaces(items)] })).toThrow(
+        /нечерновой блок называет черновой продукт src\/content\/products\/analytics\.md/,
+      );
+      expect(check({ products, blocks: [wmsScope, surfaces(items, true)] })).not.toThrow();
+    });
+  });
+
+  describe('4: мокап не повторяется в секциях одной записи', () => {
+    const second = block('surfaces', { view: 'surfaces', items: [surface('wms-console', 'wms')] });
+
+    it('тот же мокап в двух блоках одной страницы — исключение', () => {
+      const pages = [page('index', { sections: refs('wms-surfaces', 'surfaces') })];
+      expect(check({ pages, blocks: [wmsScope, wmsSurfaces, second] })).toThrow(
+        /index\.md: мокап «wms-console» повторяется в секциях/,
+      );
+    });
+
+    it('тот же мокап дважды в одном блоке продукта — исключение', () => {
+      const twice = block('wms-surfaces', {
+        view: 'surfaces',
+        items: [surface('wms-console', 'wms'), surface('wms-console', 'wms')],
+      });
+      expect(check({ blocks: [wmsScope, twice] })).toThrow(/wms\.md: мокап «wms-console» повторяется в секциях/);
+    });
+
+    it('один мокап на главной и на странице продукта — допустим', () => {
+      const pages = [page('index', { sections: refs('surfaces') })];
+      expect(check({ pages, blocks: [wmsScope, wmsSurfaces, second] })).not.toThrow();
+    });
+  });
+
+  describe('5: мокап в секциях ⇒ site.mockupNote', () => {
+    it('нет подписи или она из пробелов — исключение с именем мокапа', () => {
+      expect(check({ site: {} })).toThrow(/site\.yaml: на сайте есть мокапы \(wms-console\), но не задан mockupNote/);
+      expect(check({ site: { mockupNote: '  ' } })).toThrow(/не задан mockupNote/);
+    });
+
+    it('мокап только в черновом блоке — подпись всё равно нужна: стейджинг его рендерит', () => {
+      const draft = block('wms-surfaces', { view: 'surfaces', items: [surface('wms-console', 'wms')], draft: true });
+      expect(check({ blocks: [wmsScope, draft], site: {} })).toThrow(/не задан mockupNote/);
+    });
+
+    it('мокап есть в коллекции, но ни в одной секции — подпись не нужна', () => {
+      const products = [pageProduct('wms')];
+      expect(check({ products, site: {} })).not.toThrow();
+    });
+  });
+
+  describe('6: OG — PNG 1200×630 у страницы, продукта и сайта', () => {
+    const cases = [
+      ['JPG 1200×630', og('jpg')],
+      ['PNG 1200×600', og('png', 1200, 600)],
+      ['PNG 1201×630', og('png', 1201, 630)],
+    ] as const;
+
+    it.each(cases)('%s у страницы — исключение', (_, image) => {
+      expect(check({ pages: [page('index', { ogImage: image })] })).toThrow(/index\.md: ogImage: OG-картинка .* нужна png 1200×630/);
+    });
+
+    it.each(cases)('%s у продукта — исключение', (_, image) => {
+      expect(check({ products: [pageProduct('wms', { sections: refs('wms-scope'), ogImage: image })] })).toThrow(
+        /wms\.md: ogImage: OG-картинка/,
+      );
+    });
+
+    it.each(cases)('%s у сайта — исключение', (_, image) => {
+      expect(check({ site: { mockupNote: 'Демо-данные.', seo: { defaultOgImage: image } } })).toThrow(
+        /site\.yaml: seo\.defaultOgImage: OG-картинка/,
+      );
+    });
+
+    it('PNG 1200×630 у всех трёх — допустимо', () => {
+      expect(
+        check({
+          pages: [page('index', { ogImage: og() })],
+          products: [pageProduct('wms', { sections: refs('wms-scope', 'wms-surfaces'), ogImage: og() })],
+          site: { mockupNote: 'Демо-данные.', seo: { defaultOgImage: og() } },
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  it.each(['Wms_Console', 'a/b', 'wms-console-'])('7: id мокапа «%s» — исключение', (id) => {
+    expect(check({ mockups: [mockup('wms-console'), mockup(id)] })).toThrow(`${id}.yaml: id «${id}» не соответствует формату`);
+  });
+
+  describe('8: видимая в production страница продукта не пустеет без черновых блоков', () => {
+    const allDraft = [block('wms-scope', { view: 'list', draft: true }), block('wms-surfaces', { ...wmsSurfaces.data, draft: true })];
+
+    it('pageDraft: false и все секции черновые — исключение; pageDraft: true — допустимо', () => {
+      expect(check({ blocks: allDraft })).toThrow(/wms\.md: страница продукта видима в production, но все её секции — черновики/);
+      expect(check({ blocks: allDraft, products: [{ ...wms, data: { ...wms.data, pageDraft: true } }] })).not.toThrow();
+    });
+
+    it('черновой продукт — допустимо; хотя бы одна нечерновая секция — допустимо', () => {
+      expect(check({ blocks: allDraft, products: [{ ...wms, data: { ...wms.data, draft: true } }] })).not.toThrow();
+      expect(check({ blocks: [wmsScope, allDraft[1]!] })).not.toThrow();
+    });
+  });
+});
+
+describe('resolveSections для продукта', () => {
+  const blocks = [block('a'), block('wip', { draft: true }), block('b')];
+  const wms = pageProduct('wms', { sections: refs('b', 'wip', 'a') });
+
+  it('порядок — как в sections; production исключает черновой блок', () => {
+    expect(ids(resolveSections(wms, blocks, 'staging'))).toEqual(['b', 'wip', 'a']);
+    expect(ids(resolveSections(wms, blocks, 'production'))).toEqual(['b', 'a']);
+  });
+
+  it('отсутствующий блок — ошибка с именем файла продукта', () => {
+    expect(() => resolveSections(pageProduct('wms', { sections: refs('nope') }), blocks, 'staging')).toThrow(
+      /src\/content\/products\/wms\.md: секция «nope» не найдена/,
+    );
   });
 });
 

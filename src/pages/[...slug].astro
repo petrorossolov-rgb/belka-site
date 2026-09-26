@@ -1,9 +1,12 @@
 ---
 // Страницы из `pages/*.md`: маршрут = id (`legal/privacy` → /legal/privacy/). Зарезервированные
 // id (`index`, `404`) строят свои шаблоны — иначе, например, появился бы /404/.
+// Страница = герой (`hero.eyebrow`, `h1` — `hero.heading` или `title`, `hero.lead`), тело
+// Markdown и секции из `sections` (общий рендер `Sections.astro`).
 import { render } from 'astro:content';
+import Sections from '../components/sections/Sections.astro';
 import Base from '../layouts/Base.astro';
-import { RESERVED_PAGE_IDS, getSite, getVisible, type Page } from '../lib/content';
+import { RESERVED_PAGE_IDS, getSections, getSite, getVisible, type Page } from '../lib/content';
 import { buildTitle } from '../lib/seo';
 
 export async function getStaticPaths() {
@@ -20,16 +23,18 @@ interface Props {
 const { page } = Astro.props;
 const site = await getSite();
 const { Content } = await render(page);
+const sections = await getSections(page);
 const { title, description, draft, hero, ogImage, ogImageAlt } = page.data;
 ---
 
 <Base title={buildTitle(title, site.name)} description={description} draft={draft} ogImage={ogImage} ogImageAlt={ogImageAlt}>
   <article class="container page">
     {hero?.eyebrow && <p class="eyebrow">{hero.eyebrow}</p>}
-    <h1>{title}</h1>
+    <h1>{hero?.heading ?? title}</h1>
     {hero?.lead && <p class="page__lead">{hero.lead}</p>}
     <Content />
   </article>
+  <Sections blocks={sections} />
 </Base>
 
 <style>

@@ -1,0 +1,38 @@
+---
+// Вид `surfaces`: скелет до T11 — только заголовок и текст пункта, без фигуры мокапа и без
+// имени продукта. Нужен, чтобы карта `VIEWS: Record<BlockView, …>` собиралась; блоков
+// `surfaces` в контенте до T11 нет, поэтому скелет нигде не рендерится.
+import type { Block } from '../../lib/content';
+
+interface Props {
+  block: Block;
+}
+
+const { items } = Astro.props.block.data;
+---
+
+<ul class="surfaces" role="list">
+  {
+    items.map((item) => (
+      <li class="surfaces__item">
+        <h3>{item.title}</h3>
+        {item.text && <p>{item.text}</p>}
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .surfaces {
+    display: grid;
+    gap: var(--space-lg);
+    padding: 0;
+    list-style: none;
+  }
+
+  .surfaces__item {
+    display: grid;
+    gap: var(--space-xs);
+    min-width: 0;
+  }
+</style>

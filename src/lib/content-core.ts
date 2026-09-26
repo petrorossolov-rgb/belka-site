@@ -2,7 +2,8 @@
 // Без импорта `astro:*` — работает на любых объектах вида `{ id, data, body? }`,
 // поэтому тесты не поднимают Astro. Доступ к коллекциям — только `src/lib/content.ts`.
 
-import type { BlockView } from './schemas';
+import { LIMITS, type BlockView, type MockupKind } from './schemas';
+import { productTitle } from './seo';
 import type { SiteEnv } from './site-env';
 
 /** Формат id записи (и каждого сегмента вложенного id страницы). */
@@ -34,32 +35,52 @@ interface EntryLike<D> {
 
 export type VisibilityEntry = EntryLike<{ draft?: boolean | undefined; published?: boolean | undefined }>;
 
-export type ProductLike = EntryLike<{
-  kind: 'platform' | 'standalone';
-  mapOrder?: number | undefined;
-  hasPage: boolean;
-  pageDraft?: boolean | undefined;
-  featured?: boolean | undefined;
-  draft: boolean;
-}>;
-
 /** Ссылка на запись другой коллекции — как её отдаёт `reference()`. */
 interface RefLike {
   id: string;
 }
 
+/** Метаданные картинки, которые даёт `image()` схемы (`ImageMetadata` Astro). */
+export interface ImageMetaLike {
+  format: string;
+  width: number;
+  height: number;
+}
+
+export type ProductLike = EntryLike<{
+  name: string;
+  kind: 'platform' | 'standalone';
+  mapOrder?: number | undefined;
+  hasPage: boolean;
+  pageDraft?: boolean | undefined;
+  featured?: boolean | undefined;
+  descriptor?: string | undefined;
+  lead?: string | undefined;
+  sections?: readonly RefLike[] | undefined;
+  ogImage?: ImageMetaLike | undefined;
+  seo?: { title?: string | undefined } | undefined;
+  draft: boolean;
+}>;
+
 export type PageLike = EntryLike<{
   title: string;
   nav?: { label?: string | undefined; order: number; placement: NavPlacement } | undefined;
   sections?: readonly RefLike[] | undefined;
+  ogImage?: ImageMetaLike | undefined;
   draft: boolean;
 }>;
 
 export type BlockLike = EntryLike<{
   view: BlockView;
+  items?: readonly { mockup?: RefLike | undefined; product?: RefLike | undefined }[] | undefined;
   link?: { page: RefLike; label: string } | undefined;
   draft: boolean;
 }>;
+
+export type MockupLike = EntryLike<{ kind: MockupKind }>;
+
+/** OG-карточка любой записи: PNG 1200×630 (шаблон, `check-dist-seo` и превью мессенджеров). */
+export const OG_IMAGE = { format: 'png', width: 1200, height: 630 } as const;
 
 export type CaseLike = EntryLike<{ published: boolean; product: RefLike }>;
 
@@ -141,15 +162,19 @@ export function isLinkable(product: RefLike, productPages: readonly RefLike[]): 
 }
 
 /**
- * Секции страницы в порядке `sections`; в production черновые блоки исключены.
+ * Секции страницы или продукта в порядке `sections`; в production черновые блоки исключены.
  * Отсутствующий блок — ошибка (целостность ловит её раньше, здесь — страховка рендера).
  */
-export function resolveSections<B extends BlockLike>(page: PageLike, blocks: readonly B[], env: SiteEnv): B[] {
+export function resolveSections<B extends BlockLike>(
+  entry: PageLike | ProductLike,
+  blocks: readonly B[],
+  env: SiteEnv,
+): B[] {
   const byId = new Map(blocks.map((b) => [b.id, b]));
-  return (page.data.sections ?? []).flatMap((ref) => {
+  return (entry.data.sections ?? []).flatMap((ref) => {
     const block = byId.get(ref.id);
     if (block === undefined) {
-      throw new Error(`${source(page)}: секция «${ref.id}» не найдена в src/content/blocks`);
+      throw new Error(`${source(entry)}: секция «${ref.id}» не найдена в src/content/blocks`);
     }
     return filterVisible([block], env);
   });
@@ -229,6 +254,12 @@ function source(entry: EntryLike<unknown>): string {
   return entry.filePath ?? entry.id;
 }
 
+/** Поля `site`, которые читает проверка целостности. */
+export interface IntegritySiteLike extends FooterSiteLike {
+  mockupNote?: string | undefined;
+  seo?: { defaultOgImage?: ImageMetaLike | undefined } | undefined;
+}
+
 /**
  * Межфайловые правила, которые не проверить схемой одной записи.
  * Собирает все нарушения и бросает одно исключение — сборка падает.
@@ -238,13 +269,15 @@ export function assertContentIntegrity({
   pages,
   cases,
   blocks,
+  mockups,
   site,
 }: {
   products: readonly ProductLike[];
   pages: readonly PageLike[];
   cases: readonly CaseLike[];
   blocks: readonly BlockLike[];
-  site: FooterSiteLike;
+  mockups: readonly MockupLike[];
+  site: IntegritySiteLike;
 }): void {
   const errors: string[] = [];
 
@@ -260,6 +293,7 @@ export function assertContentIntegrity({
   products.forEach((p) => checkId(p, false));
   cases.forEach((c) => checkId(c, false));
   blocks.forEach((b) => checkId(b, false));
+  mockups.forEach((m) => checkId(m, false));
   pages.forEach((p) => checkId(p, true));
 
   const byMapOrder = new Map<number, ProductLike>();
@@ -274,9 +308,29 @@ export function assertContentIntegrity({
     }
   }
 
+  // Страница продукта — герой и секции: нужны пояснение имени, лид и хотя бы одна секция.
+  // Тела нет: шаблон его не выводит, и текст в нём молча пропал бы (как у блоков, кроме text).
+  // Правило действует и на черновые страницы: стейджинг их рендерит.
   for (const product of products) {
-    if (product.data.hasPage && (product.body ?? '').trim() === '') {
-      errors.push(`${source(product)}: hasPage: true, но у продукта нет текста страницы`);
+    if (!product.data.hasPage) continue;
+    const missing = [
+      product.data.descriptor === undefined && 'descriptor',
+      product.data.lead === undefined && 'lead',
+      (product.data.sections ?? []).length === 0 && 'sections',
+    ].filter((field) => field !== false);
+    if (missing.length > 0) {
+      errors.push(`${source(product)}: у продукта со страницей (hasPage) нужны ${missing.join(', ')}`);
+    }
+    if ((product.body ?? '').trim() !== '') {
+      errors.push(`${source(product)}: у продукта со страницей (hasPage) тела нет — страница собирается из sections`);
+    }
+    // `<title>` до суффикса сайта — как у страницы (`titleMax`): «имя — пояснение» длиннее
+    // лимита требует короткого `seo.title` (его длину держит схема).
+    const title = productTitle(product.data);
+    if (title.length > LIMITS.titleMax) {
+      errors.push(
+        `${source(product)}: заголовок страницы «${title}» длиннее ${LIMITS.titleMax} символов — задайте seo.title`,
+      );
     }
   }
 
@@ -290,22 +344,90 @@ export function assertContentIntegrity({
     }
   }
 
-  // Секции: ссылки существуют (`reference()` этого не проверяет) и не повторяются на странице.
-  // Правило действует и на черновые страницы: стейджинг их рендерит. Черновой блок на
-  // видимой странице допустим — production его исключает (`resolveSections`).
-  const blockIds = new Set(blocks.map((b) => b.id));
+  // Секции страниц и продуктов: ссылки существуют (`reference()` этого не проверяет) и не
+  // повторяются у одной записи. Правило действует и на черновики: стейджинг их рендерит.
+  // Черновой блок у видимой записи допустим — production его исключает (`resolveSections`).
+  // Один мокап не повторяется в секциях одной записи: одинаковые фигуры — ошибка автора.
+  const blocksById = new Map(blocks.map((b) => [b.id, b]));
   const pageIds = new Set(pages.map((p) => p.id));
-  for (const page of pages) {
+  const sectionOwners: readonly (PageLike | ProductLike)[] = [...pages, ...products];
+  const shownMockups = new Set<string>();
+  for (const owner of sectionOwners) {
     const seen = new Set<string>();
-    for (const ref of page.data.sections ?? []) {
-      if (!blockIds.has(ref.id)) {
-        errors.push(`${source(page)}: секция «${ref.id}» не найдена в src/content/blocks`);
+    const ownerMockups = new Set<string>();
+    for (const ref of owner.data.sections ?? []) {
+      const block = blocksById.get(ref.id);
+      if (block === undefined) {
+        errors.push(`${source(owner)}: секция «${ref.id}» не найдена в src/content/blocks`);
       } else if (seen.has(ref.id)) {
-        errors.push(`${source(page)}: секция «${ref.id}» повторяется`);
+        errors.push(`${source(owner)}: секция «${ref.id}» повторяется`);
+      } else {
+        for (const item of block.data.items ?? []) {
+          if (item.mockup === undefined) continue;
+          if (ownerMockups.has(item.mockup.id)) {
+            errors.push(`${source(owner)}: мокап «${item.mockup.id}» повторяется в секциях`);
+          }
+          ownerMockups.add(item.mockup.id);
+          shownMockups.add(item.mockup.id);
+        }
       }
       seen.add(ref.id);
     }
   }
+
+  // Видимая в production страница продукта не пустеет, когда production исключает черновые
+  // блоки (Constitution 7). Проверка не зависит от окружения сборки: стейджинг тоже её держит.
+  for (const product of products) {
+    const sections = product.data.sections ?? [];
+    if (!product.data.hasPage || product.data.draft || product.data.pageDraft || sections.length === 0) continue;
+    if (!sections.some((ref) => blocksById.get(ref.id)?.data.draft === false)) {
+      errors.push(`${source(product)}: страница продукта видима в production, но все её секции — черновики`);
+    }
+  }
+
+  // Пункты поверхностей: мокап и продукт существуют; продукт назван с пояснением
+  // (Constitution 3); нечерновой блок не называет черновой продукт — иначе production
+  // показал бы имя скрытого продукта.
+  const mockupIds = new Set(mockups.map((m) => m.id));
+  for (const block of blocks) {
+    (block.data.items ?? []).forEach((item, i) => {
+      if (item.mockup !== undefined && !mockupIds.has(item.mockup.id)) {
+        errors.push(`${source(block)}: пункт ${i + 1} — мокап «${item.mockup.id}» не найден в src/content/mockups`);
+      }
+      if (item.product === undefined) return;
+      const product = productsById.get(item.product.id);
+      if (product === undefined) {
+        errors.push(`${source(block)}: пункт ${i + 1} — продукт «${item.product.id}» не найден`);
+      } else {
+        if (product.data.descriptor === undefined) {
+          errors.push(`${source(block)}: пункт ${i + 1} — у продукта ${source(product)} нет descriptor`);
+        }
+        if (!block.data.draft && product.data.draft) {
+          errors.push(`${source(block)}: пункт ${i + 1} — нечерновой блок называет черновой продукт ${source(product)}`);
+        }
+      }
+    });
+  }
+
+  // Подпись о демо-данных у каждой фигуры (Constitution 1): мокап в секциях любой записи,
+  // в том числе черновой, — стейджинг его рендерит.
+  if (shownMockups.size > 0 && (site.mockupNote ?? '').trim() === '') {
+    errors.push(`src/content/site.yaml: на сайте есть мокапы (${[...shownMockups].join(', ')}), но не задан mockupNote`);
+  }
+
+  // OG-карточка — PNG 1200×630: так её рисует build:og и принимает check-dist-seo.
+  const checkOg = (where: string, image: ImageMetaLike | undefined) => {
+    if (image === undefined) return;
+    if (image.format !== OG_IMAGE.format || image.width !== OG_IMAGE.width || image.height !== OG_IMAGE.height) {
+      errors.push(
+        `${where}: OG-картинка ${image.format} ${image.width}×${image.height}, нужна ` +
+          `${OG_IMAGE.format} ${OG_IMAGE.width}×${OG_IMAGE.height}`,
+      );
+    }
+  };
+  pages.forEach((p) => checkOg(`${source(p)}: ogImage`, p.data.ogImage));
+  products.forEach((p) => checkOg(`${source(p)}: ogImage`, p.data.ogImage));
+  checkOg('src/content/site.yaml: seo.defaultOgImage', site.seo?.defaultOgImage);
 
   for (const block of blocks) {
     const link = block.data.link;

@@ -1,0 +1,43 @@
+---
+// Секции любого шаблона (главная, страница `pages/*.md`, страница продукта): каждый блок —
+// в обёртке `Section`, компонент по `view` блока. Единственное место карты видов:
+// `Record<BlockView, …>` не соберётся без компонента для нового вида (Constitution 2).
+// Пустой список — пустой вывод, без обёртки.
+import CardGrid from './CardGrid.astro';
+import PlatformMap from './PlatformMap.astro';
+import ProductCards from './ProductCards.astro';
+import Section from './Section.astro';
+import Steps from './Steps.astro';
+import Surfaces from './Surfaces.astro';
+import TermList from './TermList.astro';
+import TextBlock from './TextBlock.astro';
+import type { Block } from '../../lib/content';
+import type { BlockView } from '../../lib/schemas';
+
+interface Props {
+  blocks: Block[];
+}
+
+const VIEWS: Record<BlockView, (props: { block: Block }) => unknown> = {
+  text: TextBlock,
+  cards: CardGrid,
+  steps: Steps,
+  list: TermList,
+  'platform-map': PlatformMap,
+  products: ProductCards,
+  surfaces: Surfaces,
+};
+
+const { blocks } = Astro.props;
+---
+
+{
+  blocks.map((block) => {
+    const View = VIEWS[block.data.view];
+    return (
+      <Section block={block}>
+        <View block={block} />
+      </Section>
+    );
+  })
+}
