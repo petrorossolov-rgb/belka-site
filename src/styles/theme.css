@@ -124,6 +124,7 @@
   --og-gap: 3rem;                                               /* 48: lockup → слоган */
   --og-logo-h: 9rem;                                            /* 144: высота знака */
   --og-slogan-size: 4rem;                                       /* 64 */
+  --og-product-size: 3.5rem;                                    /* 56: «name — descriptor» (build:og --product) */
 
   /* Движение */
   --motion-duration-fast: var(--dur-fast);
