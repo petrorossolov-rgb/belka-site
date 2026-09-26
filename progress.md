@@ -56,6 +56,8 @@
 ## Follow-ups
 <!-- Tasks deferred from /my-incident or /my-change that need proper implementation later. -->
 
+- [ ] 2026-09-26 Локально под нагрузкой (десятки процессов MCP-серверов других сессий, CPU ~85%) `npm test` роняет по таймауту 5 с случайные тесты с дочерними процессами: `stylelint-tokens`, CLI `check-voice`, `content-access`. По отдельности и в CI зелёные, на `main` воспроизводится так же. Не ослаблять: при повторе — разобрать через `/my-change` (например, `testTimeout` у файлов, которые запускают Stylelint или CLI, с обоснованием). (ep02 T14)
+
 - [ ] 2026-09-25 TTL зоны belkascm.ru в reg.ru — 86400 (B2 предполагал 300 на время запуска). Перед любой правкой зоны снизить TTL до 300 и дождаться истечения старого; после правки и недели стабильности вернуть рабочее значение (3600 и выше). Решение по окончательному значению — владельца. (ep01 T14, T25)
 - [ ] 2026-09-25 HSTS: поднять `Strict-Transport-Security` с `max-age=300` до `max-age=31536000` после недели стабильности HTTPS (не раньше 2026-10-02) — правка `infra/nginx/snippets/security-headers.conf` через PR, установка на сервер по runbook. `includeSubDomains` и `preload` — только отдельным решением: они задевают `staging` и любые будущие поддомены. Смоук значение `max-age` не сверяет. (ep01 T25)
 - [ ] 2026-09-25 `monitor.yml`: GitHub отключает scheduled workflows через 60 дней без коммитов в репозитории. Если между эпиками пауза дольше ~50 дней — пустой коммит или `gh workflow enable monitor.yml`; статус — `gh workflow list`. Порядок — `docs/runbooks/deploy.md`. (ep01 T19, T25)
