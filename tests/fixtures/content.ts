@@ -1,6 +1,6 @@
 // Записи коллекций в форме после схемы (`{ id, data, body?, filePath? }`) для тестов ядра контента.
 
-import type { CaseLike, PageLike, ProductLike } from '../../src/lib/content-core';
+import type { BlockLike, CaseLike, PageLike, ProductLike } from '../../src/lib/content-core';
 
 export function product(
   id: string,
@@ -28,6 +28,21 @@ export function page(id: string, data: Partial<PageLike['data']> = {}): PageLike
     body: '',
     data: { title: `Страница ${id}`, draft: false, ...data },
   };
+}
+
+/** Блок: по умолчанию `view: cards` без тела; у `view: text` тело передаётся явно. */
+export function block(id: string, data: Partial<BlockLike['data']> = {}, body = ''): BlockLike {
+  return {
+    id,
+    filePath: `src/content/blocks/${id}.md`,
+    body,
+    data: { view: 'cards', draft: false, ...data },
+  };
+}
+
+/** Ссылки `sections` в форме `reference()`. */
+export function refs(...ids: string[]): { id: string }[] {
+  return ids.map((id) => ({ id }));
 }
 
 export function caseEntry(id: string, productId: string, published: boolean): CaseLike {

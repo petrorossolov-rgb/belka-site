@@ -1,16 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  RESERVED_PAGE_IDS,
   assertContentIntegrity,
+  blockLink,
   buildNav,
   filterVisible,
+  getFeaturedProducts,
   getPlatformMap,
+  getProductPages,
   getStandaloneProducts,
+  isLinkable,
   pageHref,
+  resolveSections,
   showsDrafts,
   visibleContacts,
   visibleLegal,
 } from '../src/lib/content-core';
-import { caseEntry, ep01Products, page, product, standalone } from './fixtures/content';
+import { block, caseEntry, ep01Products, page, product, refs, standalone } from './fixtures/content';
 
 const ids = (entries: readonly { id: string }[]) => entries.map((e) => e.id);
 
@@ -133,14 +139,20 @@ describe('карта платформы и отдельные продукты',
 });
 
 describe('assertContentIntegrity', () => {
-  const valid = { products: ep01Products, pages: [page('index'), page('legal/privacy')], cases: [] };
+  const valid = {
+    products: ep01Products,
+    pages: [page('index'), page('legal/privacy')],
+    cases: [],
+    blocks: [],
+    site: {},
+  };
 
   it('принимает набор ep01 и вложенный id страницы', () => {
     expect(() => assertContentIntegrity(valid)).not.toThrow();
   });
 
   it('пустые коллекции — без исключений', () => {
-    expect(() => assertContentIntegrity({ products: [], pages: [], cases: [] })).not.toThrow();
+    expect(() => assertContentIntegrity({ products: [], pages: [], cases: [], blocks: [], site: {} })).not.toThrow();
   });
 
   it('дубль mapOrder — исключение с именами обоих файлов', () => {
@@ -207,6 +219,219 @@ describe('assertContentIntegrity', () => {
     expect(message).toMatch(/не соответствует формату/);
     expect(message).toMatch(/mapOrder 1 повторяется/);
     expect(message).toMatch(/hasPage: true/);
+  });
+});
+
+describe('RESERVED_PAGE_IDS', () => {
+  it('главная и 404 — свои шаблоны', () => {
+    expect(RESERVED_PAGE_IDS).toEqual(['index', '404']);
+  });
+});
+
+describe('getFeaturedProducts', () => {
+  const products = [
+    standalone('packapp', { featured: true }),
+    standalone('another', { featured: true }),
+    product('portal', { mapOrder: 2, featured: true }),
+    product('wms', { mapOrder: 1, featured: true }),
+    product('yms', { mapOrder: 3 }),
+  ];
+
+  it('сначала платформа по mapOrder, затем отдельные по id; без featured — не карточка', () => {
+    expect(ids(getFeaturedProducts(products))).toEqual(['wms', 'portal', 'another', 'packapp']);
+  });
+
+  it('черновой продукт в production исключён, на стейджинге — есть', () => {
+    const withDraft = [...products, product('tms', { mapOrder: 4, featured: true, draft: true })];
+    expect(ids(getFeaturedProducts(filterVisible(withDraft, 'production')))).not.toContain('tms');
+    expect(ids(getFeaturedProducts(filterVisible(withDraft, 'staging')))).toContain('tms');
+  });
+
+  it('пустая коллекция — пустой массив', () => {
+    expect(getFeaturedProducts([])).toEqual([]);
+  });
+});
+
+describe('getProductPages и pageDraft', () => {
+  const wms = product('wms', { mapOrder: 1, hasPage: true, pageDraft: true });
+  const portal = product('portal', { mapOrder: 2, hasPage: true });
+  const yms = product('yms', { mapOrder: 3 });
+  const products = [wms, portal, yms];
+
+  it('pageDraft: страницы нет в production, есть в staging и development', () => {
+    expect(ids(getProductPages(products, 'production'))).toEqual(['portal']);
+    expect(ids(getProductPages(products, 'staging'))).toEqual(['wms', 'portal']);
+    expect(ids(getProductPages(products, 'development'))).toEqual(['wms', 'portal']);
+  });
+
+  it('сам продукт с pageDraft видим в обоих окружениях', () => {
+    for (const env of ['production', 'staging'] as const) {
+      expect(ids(getPlatformMap(filterVisible(products, env)))).toContain('wms');
+    }
+  });
+
+  it('черновой продукт — без страницы в production, даже без pageDraft', () => {
+    const draft = product('tms', { mapOrder: 4, hasPage: true, draft: true });
+    expect(ids(getProductPages([draft], 'production'))).toEqual([]);
+    expect(ids(getProductPages([draft], 'staging'))).toEqual(['tms']);
+  });
+
+  it('без hasPage страницы нет ни в одном окружении', () => {
+    expect(getProductPages([yms], 'staging')).toEqual([]);
+  });
+
+  it('isLinkable: ссылка только на собранную страницу', () => {
+    expect(isLinkable(wms, getProductPages(products, 'production'))).toBe(false);
+    expect(isLinkable(wms, getProductPages(products, 'staging'))).toBe(true);
+    expect(isLinkable(portal, getProductPages(products, 'production'))).toBe(true);
+    expect(isLinkable(yms, getProductPages(products, 'staging'))).toBe(false);
+  });
+});
+
+describe('resolveSections', () => {
+  const blocks = [block('b'), block('a'), block('wip', { draft: true }), block('c')];
+  const home = page('index', { sections: refs('c', 'wip', 'a') });
+
+  it('порядок — как в sections, не как в коллекции', () => {
+    expect(ids(resolveSections(home, blocks, 'staging'))).toEqual(['c', 'wip', 'a']);
+  });
+
+  it('production исключает черновые блоки, staging и development — показывают', () => {
+    expect(ids(resolveSections(home, blocks, 'production'))).toEqual(['c', 'a']);
+    expect(ids(resolveSections(home, blocks, 'development'))).toEqual(['c', 'wip', 'a']);
+  });
+
+  it('страница без sections — пустой список', () => {
+    expect(resolveSections(page('about'), blocks, 'production')).toEqual([]);
+  });
+
+  it('отсутствующий блок — ошибка с именем файла страницы', () => {
+    expect(() => resolveSections(page('index', { sections: refs('a', 'nope') }), blocks, 'production')).toThrow(
+      /src\/content\/pages\/index\.md: секция «nope» не найдена/,
+    );
+  });
+});
+
+describe('blockLink', () => {
+  const pages = [page('index'), page('approach', { draft: true })];
+  const teaser = block('approach-teaser', { link: { page: { id: 'approach' }, label: 'Подробнее' } });
+
+  it('целевая страница — черновик: в production ссылки нет, в staging есть', () => {
+    expect(blockLink(teaser, filterVisible(pages, 'production'))).toBeUndefined();
+    expect(blockLink(teaser, filterVisible(pages, 'staging'))).toEqual({ href: '/approach/', label: 'Подробнее' });
+  });
+
+  it('блок без link — без ссылки', () => {
+    expect(blockLink(block('plain'), pages)).toBeUndefined();
+  });
+
+  it('ссылка на главную — корень', () => {
+    const home = block('home-link', { link: { page: { id: 'index' }, label: 'На главную' } });
+    expect(blockLink(home, pages)).toEqual({ href: '/', label: 'На главную' });
+  });
+});
+
+describe('assertContentIntegrity: секции, маршруты, контакты (ep02)', () => {
+  const home = (...sections: string[]) => page('index', { sections: refs(...sections) });
+  const theses = block('theses');
+  const team = block('team', { view: 'text' }, 'Текст команды.');
+  const base = {
+    products: ep01Products,
+    pages: [home('theses', 'team')],
+    cases: [],
+    blocks: [theses, team],
+    site: {},
+  };
+  const check = (patch: Partial<Parameters<typeof assertContentIntegrity>[0]>) => () =>
+    assertContentIntegrity({ ...base, ...patch });
+
+  it('набор с секциями — без исключений', () => {
+    expect(check({})).not.toThrow();
+  });
+
+  it('1: id блока — формат ENTRY_ID, вложенный id не допускается', () => {
+    for (const id of ['Theses', 'the_ses', 'team/one']) {
+      expect(check({ blocks: [theses, team, block(id)] })).toThrow(`${id}.md: id «${id}» не соответствует формату`);
+    }
+  });
+
+  it('2: секция на несуществующий блок — исключение, в том числе на черновой странице', () => {
+    expect(check({ pages: [home('theses', 'nope')] })).toThrow(/index\.md: секция «nope» не найдена/);
+    expect(check({ pages: [home('theses'), page('wip', { draft: true, sections: refs('nope') })] })).toThrow(
+      /wip\.md: секция «nope» не найдена/,
+    );
+  });
+
+  it('2: ссылка блока на несуществующую страницу — исключение, на черновую — допустима', () => {
+    const linked = (id: string) => block('theses', { link: { page: { id }, label: 'Подробнее' } });
+    expect(check({ blocks: [linked('nope'), team] })).toThrow(/theses\.md: ссылка на страницу «nope», которой нет/);
+    expect(
+      check({ blocks: [linked('approach'), team], pages: [...base.pages, page('approach', { draft: true })] }),
+    ).not.toThrow();
+  });
+
+  it('3: блок повторяется в sections одной страницы — исключение; на разных страницах — допустимо', () => {
+    expect(check({ pages: [home('theses', 'team', 'theses')] })).toThrow(/секция «theses» повторяется/);
+    expect(check({ pages: [home('theses'), page('about', { sections: refs('theses') })] })).not.toThrow();
+  });
+
+  it('4: у view: text нужно непустое тело', () => {
+    for (const body of ['', '  \n\n  ']) {
+      expect(check({ blocks: [theses, block('team', { view: 'text' }, body)] })).toThrow(
+        /team\.md: у view: text нужен текст в теле/,
+      );
+    }
+  });
+
+  it('4: у остальных view тела нет; пробелы телом не считаются', () => {
+    expect(check({ blocks: [block('theses', {}, 'Лишний текст.'), team] })).toThrow(
+      /theses\.md: у view: cards тела нет/,
+    );
+    expect(check({ blocks: [block('theses', { view: 'platform-map' }, 'Текст.'), team] })).toThrow(
+      /у view: platform-map тела нет/,
+    );
+    expect(check({ blocks: [block('theses', {}, '\n  \n'), team] })).not.toThrow();
+  });
+
+  it('5: id страницы не начинается с products/', () => {
+    expect(check({ pages: [...base.pages, page('products/wms')] })).toThrow(
+      /products\/wms\.md: id «products\/wms» занимает маршрут страниц продуктов/,
+    );
+    expect(check({ pages: [...base.pages, page('products-overview')] })).not.toThrow();
+  });
+
+  it('6: у 404 нет nav, sections и draft', () => {
+    expect(check({ pages: [...base.pages, page('404')] })).not.toThrow();
+    expect(check({ pages: [...base.pages, page('404', { sections: [] })] })).not.toThrow();
+    expect(check({ pages: [...base.pages, page('404', { nav: { order: 1, placement: 'footer' } })] })).toThrow(
+      /404\.md: у страницы 404 нет nav/,
+    );
+    expect(check({ pages: [...base.pages, page('404', { sections: refs('theses') })] })).toThrow(
+      /404\.md: у страницы 404 нет sections/,
+    );
+    expect(check({ pages: [...base.pages, page('404', { draft: true })] })).toThrow(
+      /404\.md: страница 404 не бывает черновиком/,
+    );
+  });
+
+  it('7: видимая страница контактов требует канал; черновая — нет', () => {
+    expect(check({ pages: [...base.pages, page('contacts')] })).toThrow(
+      /contacts\.md: страница контактов видима, но в site\.contacts нет ни одного канала/,
+    );
+    expect(check({ pages: [...base.pages, page('contacts', { draft: true })] })).not.toThrow();
+    expect(
+      check({ pages: [...base.pages, page('contacts')], site: { contacts: { email: 'hello@example.ru' } } }),
+    ).not.toThrow();
+  });
+
+  it('7: канал из одних пробелов не считается', () => {
+    expect(
+      check({ pages: [...base.pages, page('contacts')], site: { contacts: { email: '  ', telegram: ' ' } } }),
+    ).toThrow(/нет ни одного канала/);
+  });
+
+  it('8: черновой блок на видимой странице допустим', () => {
+    expect(check({ blocks: [block('theses', { draft: true }), team] })).not.toThrow();
   });
 });
 
