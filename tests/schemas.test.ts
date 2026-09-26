@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'astro/zod';
-import { caseSchema, pageSchema, productSchema, siteSchema } from '../src/lib/schemas';
 import {
+  BLOCK_VIEWS,
+  LIMITS,
+  blockSchema,
+  caseSchema,
+  pageSchema,
+  productSchema,
+  siteSchema,
+} from '../src/lib/schemas';
+import {
+  validCardsBlock,
   validCase,
   validPage,
   validPlatformProduct,
@@ -12,7 +21,9 @@ import {
 
 // `image()` и `reference()` есть только у Astro — в тестах их заменяют строки.
 const image = () => z.string();
-const page = pageSchema(image);
+const reference = () => z.string();
+const page = pageSchema(image, reference);
+const block = blockSchema(reference);
 const site = siteSchema(image);
 const caseWithProduct = caseSchema.extend({ product: z.string() });
 
@@ -23,16 +34,59 @@ function issuePaths(schema: z.ZodType, data: unknown): string[] {
   return result.error!.issues.map((issue) => issue.path.join('.'));
 }
 
+/** Строка ровно по лимиту проходит, на символ длиннее — единственная ошибка по пути `path`. */
+function expectLimit(schema: z.ZodType, build: (value: string) => unknown, max: number, path: string) {
+  expect(schema.safeParse(build('я'.repeat(max))).success, `${path}: ${max} символов`).toBe(true);
+  expect(issuePaths(schema, build('я'.repeat(max + 1)))).toEqual([path]);
+}
+
+describe('LIMITS и BLOCK_VIEWS', () => {
+  it('лимиты новых полей — как в плане ep02', () => {
+    expect(LIMITS).toMatchObject({ headingMax: 80, eyebrowMax: 60, leadMax: 320, linkLabelMax: 40, altMax: 120 });
+  });
+
+  it('виды секций', () => {
+    expect(BLOCK_VIEWS).toEqual(['text', 'cards', 'steps', 'list', 'platform-map', 'products']);
+  });
+});
+
 describe('product', () => {
   it('принимает продукт платформы и отдельный продукт', () => {
     expect(productSchema.parse(validPlatformProduct)).toMatchObject({ kind: 'platform', mapOrder: 1 });
     expect(productSchema.parse(validStandaloneProduct)).toMatchObject({ kind: 'standalone' });
   });
 
-  it('подставляет значения по умолчанию: hasPage и draft — false', () => {
+  it('подставляет значения по умолчанию: hasPage, pageDraft, featured и draft — false', () => {
     const parsed = productSchema.parse(validStandaloneProduct);
-    expect(parsed.hasPage).toBe(false);
-    expect(parsed.draft).toBe(false);
+    expect(parsed).toMatchObject({ hasPage: false, pageDraft: false, featured: false, draft: false });
+    expect(parsed.lead).toBeUndefined();
+  });
+
+  it('принимает карточку на главной с lead', () => {
+    const parsed = productSchema.parse({ ...validStandaloneProduct, featured: true, lead: 'Текст карточки.' });
+    expect(parsed).toMatchObject({ featured: true, lead: 'Текст карточки.' });
+  });
+
+  it('отклоняет featured без lead', () => {
+    expect(issuePaths(productSchema, { ...validStandaloneProduct, featured: true })).toEqual(['lead']);
+  });
+
+  it('принимает lead без featured', () => {
+    expect(productSchema.safeParse({ ...validStandaloneProduct, lead: 'Лид страницы.' }).success).toBe(true);
+  });
+
+  it('ограничивает lead лимитом leadMax', () => {
+    expectLimit(productSchema, (lead) => ({ ...validStandaloneProduct, lead }), LIMITS.leadMax, 'lead');
+  });
+
+  it('принимает черновую страницу у продукта со страницей', () => {
+    const parsed = productSchema.parse({ ...validPlatformProduct, draft: false, pageDraft: true });
+    expect(parsed).toMatchObject({ hasPage: true, pageDraft: true, draft: false });
+  });
+
+  it('отклоняет pageDraft без hasPage — и явный false, и по умолчанию', () => {
+    expect(issuePaths(productSchema, { ...validPlatformProduct, hasPage: false, pageDraft: true })).toEqual(['pageDraft']);
+    expect(issuePaths(productSchema, { ...validStandaloneProduct, pageDraft: true })).toEqual(['pageDraft']);
   });
 
   it('отклоняет неверный kind', () => {
@@ -116,6 +170,120 @@ describe('page', () => {
     const paths = issuePaths(page, { ...validPage, nav: { order: 1, placement: 'sidebar' } });
     expect(paths).toContain('nav.placement');
   });
+
+  it('sections по умолчанию — пустой список, когда поля нет', () => {
+    expect(page.parse(validPage).sections).toEqual([]);
+  });
+
+  it('хранит sections в порядке записи', () => {
+    expect(page.parse({ ...validPage, sections: ['theses', 'platform', 'team'] }).sections).toEqual([
+      'theses',
+      'platform',
+      'team',
+    ]);
+  });
+
+  it('отклоняет sections не списком', () => {
+    expect(issuePaths(page, { ...validPage, sections: 'theses' })).toEqual(['sections']);
+  });
+
+  it('отклоняет ogImage без ogImageAlt', () => {
+    const { ogImageAlt: _, ...withoutAlt } = validPage;
+    expect(issuePaths(page, withoutAlt)).toEqual(['ogImageAlt']);
+  });
+
+  it('принимает страницу без ogImage и без ogImageAlt', () => {
+    const { ogImage: _i, ogImageAlt: _a, ...withoutOg } = validPage;
+    expect(page.safeParse(withoutOg).success).toBe(true);
+  });
+
+  it('ограничивает ogImageAlt лимитом altMax', () => {
+    expectLimit(page, (ogImageAlt) => ({ ...validPage, ogImageAlt }), LIMITS.altMax, 'ogImageAlt');
+  });
+
+  it('hero.heading необязателен и ограничен лимитом headingMax', () => {
+    expect(page.parse(validPage).hero?.heading).toBeUndefined();
+    expectLimit(page, (heading) => ({ ...validPage, hero: { heading } }), LIMITS.headingMax, 'hero.heading');
+  });
+});
+
+describe('block', () => {
+  /** Минимальная валидная секция каждого вида. */
+  const minimal = {
+    text: { view: 'text', title: 'Команда' },
+    cards: { view: 'cards', title: 'Тезисы', items: [{ title: 'Пункт', text: 'Текст.' }] },
+    steps: { view: 'steps', title: 'Подход', items: [{ title: 'Этап', text: 'Текст.' }] },
+    list: { view: 'list', title: 'Охват', items: [{ title: 'Процесс' }] },
+    'platform-map': { view: 'platform-map', title: 'Состав платформы' },
+    products: { view: 'products', title: 'Продукты' },
+  } as const;
+
+  it('минимальная фикстура есть у каждого вида', () => {
+    expect(Object.keys(minimal)).toEqual([...BLOCK_VIEWS]);
+  });
+
+  it.each(BLOCK_VIEWS)('принимает минимальную секцию view: %s', (view) => {
+    expect(block.safeParse(minimal[view]).success).toBe(true);
+  });
+
+  it('подставляет значения по умолчанию: items — [], draft — false, без link', () => {
+    const parsed = block.parse(minimal.text);
+    expect(parsed).toMatchObject({ items: [], draft: false });
+    expect(parsed.link).toBeUndefined();
+  });
+
+  it('принимает секцию со всеми полями', () => {
+    expect(block.parse(validCardsBlock)).toMatchObject({ link: { page: 'approach', label: 'Подробнее' } });
+  });
+
+  it('отклоняет неизвестный view и секцию без title', () => {
+    expect(issuePaths(block, { ...validCardsBlock, view: 'gallery' })).toEqual(['view']);
+    const { title: _, ...withoutTitle } = validCardsBlock;
+    expect(issuePaths(block, withoutTitle)).toEqual(['title']);
+    expect(issuePaths(block, { ...validCardsBlock, title: '' })).toEqual(['title']);
+  });
+
+  it.each(['cards', 'steps', 'list'] as const)('view: %s требует хотя бы один пункт', (view) => {
+    const { items: _, ...withoutItems } = minimal[view];
+    expect(issuePaths(block, withoutItems)).toEqual(['items']);
+    expect(issuePaths(block, { ...minimal[view], items: [] })).toEqual(['items']);
+  });
+
+  it.each(['cards', 'steps'] as const)('view: %s требует text у каждого пункта', (view) => {
+    const items = [{ title: 'С текстом', text: 'Текст.' }, { title: 'Без текста' }];
+    expect(issuePaths(block, { ...minimal[view], items })).toEqual(['items.1.text']);
+  });
+
+  it('view: list принимает пункты без text', () => {
+    expect(block.safeParse({ ...minimal.list, items: [{ title: 'А' }, { title: 'Б', text: 'Пояснение.' }] }).success).toBe(
+      true,
+    );
+  });
+
+  it.each(['text', 'platform-map', 'products'] as const)('view: %s не принимает пункты', (view) => {
+    expect(issuePaths(block, { ...minimal[view], items: [{ title: 'Пункт', text: 'Текст.' }] })).toEqual(['items']);
+  });
+
+  it('link требует page и label', () => {
+    expect(issuePaths(block, { ...validCardsBlock, link: { label: 'Подробнее' } })).toEqual(['link.page']);
+    expect(issuePaths(block, { ...validCardsBlock, link: { page: 'approach' } })).toEqual(['link.label']);
+  });
+
+  it('draft — только boolean', () => {
+    expect(block.parse({ ...minimal.text, draft: true }).draft).toBe(true);
+    expect(issuePaths(block, { ...minimal.text, draft: 'да' })).toEqual(['draft']);
+  });
+
+  it.each([
+    ['eyebrow', LIMITS.eyebrowMax, (v: string) => ({ ...validCardsBlock, eyebrow: v })],
+    ['title', LIMITS.headingMax, (v: string) => ({ ...validCardsBlock, title: v })],
+    ['lead', LIMITS.leadMax, (v: string) => ({ ...validCardsBlock, lead: v })],
+    ['items.0.title', LIMITS.headingMax, (v: string) => ({ ...validCardsBlock, items: [{ title: v, text: 'Текст.' }] })],
+    ['items.0.text', LIMITS.leadMax, (v: string) => ({ ...validCardsBlock, items: [{ title: 'Пункт', text: v }] })],
+    ['link.label', LIMITS.linkLabelMax, (v: string) => ({ ...validCardsBlock, link: { page: 'approach', label: v } })],
+  ] as const)('ограничивает %s лимитом (%i символов)', (path, max, build) => {
+    expectLimit(block, build, max, path);
+  });
 });
 
 describe('site', () => {
@@ -177,6 +345,19 @@ describe('site', () => {
   it('отклоняет нечисловой counterId и невалидную почту', () => {
     expect(issuePaths(site, { ...validSite, metrika: { counterId: 'abc123' } })).toEqual(['metrika.counterId']);
     expect(issuePaths(site, { ...validSite, contacts: { email: 'hello@' } })).toEqual(['contacts.email']);
+  });
+
+  it('отклоняет seo.defaultOgImage без seo.defaultOgImageAlt', () => {
+    const data = { ...validSite, seo: { defaultOgImage: './og-default.png' } };
+    expect(issuePaths(site, data)).toEqual(['seo.defaultOgImageAlt']);
+  });
+
+  it('ограничивает seo.defaultOgImageAlt лимитом altMax', () => {
+    const withAlt = (defaultOgImageAlt: string) => ({
+      ...validSite,
+      seo: { defaultOgImage: './og-default.png', defaultOgImageAlt },
+    });
+    expectLimit(site, withAlt, LIMITS.altMax, 'seo.defaultOgImageAlt');
   });
 
   it('требует https в url', () => {

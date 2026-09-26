@@ -1,9 +1,9 @@
-// Четыре коллекции контента. Схемы — в `src/lib/schemas.ts`; здесь только лоадеры
+// Пять коллекций контента. Схемы — в `src/lib/schemas.ts`; здесь только лоадеры
 // и то, что доступно лишь из `astro:content`: `reference()` и `image()`.
 
 import { defineCollection, reference } from 'astro:content';
 import { file, glob } from 'astro/loaders';
-import { caseSchema, pageSchema, productSchema, siteSchema } from './lib/schemas';
+import { blockSchema, caseSchema, pageSchema, productSchema, siteSchema } from './lib/schemas';
 
 // Id записи = путь файла без расширения (`legal/privacy.md` → `legal/privacy`).
 // Стандартный slugify молча понижает регистр и учитывает `slug` из frontmatter —
@@ -23,7 +23,13 @@ const cases = defineCollection({
 
 const pages = defineCollection({
   loader: markdown('./src/content/pages'),
-  schema: ({ image }) => pageSchema(image),
+  schema: ({ image }) => pageSchema(image, reference),
+});
+
+// Секции страниц: `page.sections` ссылается на них по id.
+const blocks = defineCollection({
+  loader: markdown('./src/content/blocks'),
+  schema: blockSchema(reference),
 });
 
 const site = defineCollection({
@@ -31,4 +37,4 @@ const site = defineCollection({
   schema: ({ image }) => siteSchema(image),
 });
 
-export const collections = { products, cases, pages, site };
+export const collections = { products, cases, pages, blocks, site };

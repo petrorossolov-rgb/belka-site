@@ -32,6 +32,7 @@ export const validPage = {
   description: 'Как связаться с командой Belka SCM: почта и мессенджер для вопросов о платформе.',
   nav: { label: 'Контакты', order: 10, placement: 'header' },
   ogImage: './og-contacts.png',
+  ogImageAlt: 'Карточка страницы контактов',
   hero: { eyebrow: 'Надзаголовок', lead: 'Подзаголовок' },
 };
 
@@ -53,5 +54,18 @@ export const validSiteWithMetrika = {
   legal: { entityName: 'ООО «Пример»', inn: '7700000000', ogrn: '1027700000000' },
   flags: { legalEntityReady: true, metrikaEnabled: true, showReadiness: false },
   metrika: { counterId: '12345678' },
-  seo: { defaultOgImage: './og-default.png' },
+  seo: { defaultOgImage: './og-default.png', defaultOgImageAlt: 'Карточка сайта' },
+};
+
+/** Секция со всеми полями; `link.page` — id страницы (в тестах `reference()` — строка). */
+export const validCardsBlock = {
+  view: 'cards',
+  eyebrow: 'Надзаголовок',
+  title: 'Заголовок секции',
+  lead: 'Лид секции.',
+  items: [
+    { title: 'Первый пункт', text: 'Текст первого пункта.' },
+    { title: 'Второй пункт', text: 'Текст второго пункта.' },
+  ],
+  link: { page: 'approach', label: 'Подробнее' },
 };
