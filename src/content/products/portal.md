@@ -4,7 +4,7 @@ short: SupplyPortal
 domain: portal
 kind: platform
 mapOrder: 2
-summary: "Заглушка ep01: описание ещё не утверждено."
+summary: "Портал поставщика и клиента склада: поставки по тайм-слотам, остатки, заказы и акты в одном кабинете."
 readiness: in-development  # скрыто: выводится только при site.flags.showReadiness
 ---
 

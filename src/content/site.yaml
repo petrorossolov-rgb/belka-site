@@ -1,7 +1,6 @@
 # Глобальные настройки сайта. Одна запись `site` (лоадер `file`).
 # nameRu — русская редакция имени, утверждена владельцем (Constitution 3); contacts, legal,
-# metrika — пусто до ep05. seo — OG-карточка (npm run build:og); alt пока собран из имени и
-# утверждённого слогана, финальный — перенос текстов ep02 (T18).
+# metrika — пусто до ep05. seo — OG-карточка (npm run build:og) и её alt (утверждён 2026-09-26).
 site:
   name: Belka SCM
   nameRu: Белка УЦП
@@ -16,4 +15,4 @@ site:
   metrika: {}
   seo:
     defaultOgImage: ../assets/og/default.png
-    defaultOgImageAlt: Belka SCM. Знает, где что лежит.
+    defaultOgImageAlt: "Знак Belka SCM и слоган «Знает, где что лежит.»"

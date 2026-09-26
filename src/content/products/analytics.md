@@ -4,7 +4,7 @@ short: Analytics
 domain: analytics
 kind: platform
 mapOrder: 6
-summary: "Заглушка ep01: описание ещё не утверждено."
+summary: "Дашборды и аналитика для руководства: операции смены, SLA по клиентам, производительность сотрудников, запасы и ёмкость."
 readiness: planned  # скрыто: выводится только при site.flags.showReadiness
 ---
 

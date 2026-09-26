@@ -4,7 +4,7 @@ short: Billing
 domain: billing
 kind: platform
 mapOrder: 7
-summary: "Заглушка ep01: описание ещё не утверждено."
+summary: "Тарификация услуг 3PL: операции склада тарифицируются по данным WMS, за период — акт по каждому клиенту."
 readiness: planned  # скрыто: выводится только при site.flags.showReadiness
 ---
 
