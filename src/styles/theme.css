@@ -33,16 +33,20 @@
   /* Плашка героя главной: два варианта ДС, знак и словесный знак на ней — молочные.
      «Кора» — любой текст (контраст ≥ 4.5). «Рыжий» — только крупный текст (≥ 3.0;
      WCAG: от 24px или от 18.66px жирным): мелкий текст на рыжей плашке запрещён.
-     Оба варианта проверяет contrast.test.ts. Выбор — три строки маппинга ниже (T14). */
+     Акцент плашки (слоган) — только крупный текст: на коре это рыжий бренда, на рыжем — молоко.
+     Оба варианта проверяет contrast.test.ts. Выбор — четыре строки маппинга ниже (T14). */
   --plate-bark-bg: var(--bk-bark-900);
   --plate-bark-on: var(--bk-milk-50);
   --plate-bark-muted: var(--bk-oat-300);
+  --plate-bark-accent: var(--bk-rust-500);
   --plate-rust-bg: var(--bk-rust-500);
   --plate-rust-on: var(--bk-milk-50);
   --plate-rust-muted: var(--bk-milk-100);
+  --plate-rust-accent: var(--bk-milk-50);
   --color-plate-bg: var(--plate-bark-bg);
   --color-on-plate: var(--plate-bark-on);
   --color-plate-muted: var(--plate-bark-muted);
+  --color-plate-accent: var(--plate-bark-accent);
 
   /* Гарнитуры: стеки с fallback-метриками объявляет Fonts API. */
   --font-body: var(--font-sans);
@@ -81,6 +85,7 @@
   --map-columns-md: 2;                                          /* от 48rem */
   --map-columns-lg: 4;                                          /* от 64rem */
   --card-min: 16rem;                                            /* 256: минимум карточки в авто-сетке */
+  --term-min: 18rem;                                            /* 288: колонка списка охвата */
   --step-number-size: var(--text-h2);                           /* номер шага подхода */
 
   /* Отступы внутри блоков — сетка 4px ДС */

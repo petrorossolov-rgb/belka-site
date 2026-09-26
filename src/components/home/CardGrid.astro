@@ -1,0 +1,47 @@
+---
+// Вид `cards`: пункты блока — карточки ДС (белые на молоке, граница овёс, радиус 14, без тени)
+// в авто-сетке: колонка не уже `--card-min`, на 360px — одна.
+import type { Block } from '../../lib/content';
+
+interface Props {
+  block: Block;
+}
+
+const { items } = Astro.props.block.data;
+---
+
+<ul class="card-grid" role="list">
+  {
+    items.map((item) => (
+      <li class="card-grid__card">
+        <h3 class="card-grid__title">{item.title}</h3>
+        {item.text && <p>{item.text}</p>}
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--card-min), 100%), 1fr));
+    gap: var(--space-sm);
+    padding: 0;
+    list-style: none;
+  }
+
+  .card-grid__card {
+    display: grid;
+    align-content: start;
+    gap: var(--space-xs);
+    min-width: 0;
+    padding: var(--space-lg);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  .card-grid__title {
+    hyphens: auto;
+  }
+</style>

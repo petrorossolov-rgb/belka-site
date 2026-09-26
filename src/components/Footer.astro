@@ -1,5 +1,6 @@
 ---
-// Подвал: имя и слоган, © год сборки и имя; контакты, реквизиты и меню — только непустые.
+// Подвал: имя и слоган, © год сборки и имя (с русской редакцией `nameRu`, если она задана);
+// контакты, реквизиты и меню — только непустые.
 import { getNav, getSite } from '../lib/content';
 import { visibleContacts, visibleLegal } from '../lib/content-core';
 
@@ -59,7 +60,7 @@ const year = new Date().getFullYear();
         </nav>
       )
     }
-    <p class="site-footer__copy">©&nbsp;{year} {site.name}</p>
+    <p class="site-footer__copy">©&nbsp;{year} {site.name}{site.nameRu && ` · ${site.nameRu}`}</p>
   </div>
 </footer>
 

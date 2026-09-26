@@ -1,0 +1,85 @@
+---
+// Герой главной: плашка на всю ширину (цвет — токен, без фоновых растров: LCP — знак или
+// текст), lockup молочного тона как `h1`. Тексты — `pages/index.md → hero` и `site.slogan`.
+// Каждый текстовый элемент задаёт кегль явно: при рыжей плашке мелкий текст на ней запрещён,
+// и contrast.test.ts проверяет кегли этого файла.
+import Logo from '../Logo.astro';
+import type { Page, Site } from '../../lib/content';
+
+interface Props {
+  page: Page;
+  site: Site;
+}
+
+const { page, site } = Astro.props;
+const hero = page.data.hero;
+---
+
+<section class="hero">
+  <div class="container hero__inner">
+    {hero?.eyebrow && <p class="hero__eyebrow">{hero.eyebrow}</p>}
+    <h1 class="hero__title">
+      <Logo variant="lockup" size={145} alt={site.name} markTone="milk" tone="milk" priority />
+    </h1>
+    {hero?.lead && <p class="hero__lead">{hero.lead}</p>}
+    {hero?.accent && <p class="hero__accent">{hero.accent}</p>}
+    {hero?.note && <p class="hero__note">{hero.note}</p>}
+    <p class="hero__slogan">{site.slogan}</p>
+  </div>
+</section>
+
+<style>
+  .hero {
+    background: var(--color-plate-bg);
+    color: var(--color-on-plate);
+  }
+
+  .hero__inner {
+    display: grid;
+    gap: var(--space-lg);
+    justify-items: start;
+    padding-block: var(--space-section);
+  }
+
+  .hero__inner > * {
+    max-width: var(--measure);
+  }
+
+  .hero__eyebrow {
+    color: var(--color-plate-muted);
+    font-family: var(--font-code);
+    font-size: var(--text-eyebrow);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: var(--letter-spacing-caps);
+    text-transform: uppercase;
+  }
+
+  .hero__title {
+    --logo-height: var(--logo-hero-h);
+
+    margin-block-end: var(--space-xs);
+  }
+
+  .hero__lead {
+    font-size: var(--text-h3);
+    line-height: var(--leading-snug);
+  }
+
+  .hero__accent {
+    font-size: var(--text-body);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .hero__note {
+    color: var(--color-plate-muted);
+    font-size: var(--text-small);
+  }
+
+  .hero__slogan {
+    color: var(--color-plate-accent);
+    font-size: var(--text-h3);
+    font-weight: var(--font-weight-heavy);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--letter-spacing-heading);
+  }
+</style>

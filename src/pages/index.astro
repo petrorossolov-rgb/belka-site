@@ -1,17 +1,33 @@
 ---
-// Заглушка-визитка ep01 из `pages/index.md` (`hero`) и `site.yaml`; в ep02 её место займёт главная.
-// Имя не дублируется: заголовок — lockup с alt = site.name, текстом имя не повторяется.
-import Logo from '../components/Logo.astro';
+// Главная: герой из `pages/index.md → hero` и секции из `sections` — компонент по `view` блока.
+// Карта видов типизирована `Record<BlockView, …>`: новый вид без компонента не пройдёт
+// `astro check`. Шапки нет (знак крупно в герое, меню пустое), в подвале — только строка ©.
+import CardGrid from '../components/home/CardGrid.astro';
+import Hero from '../components/home/Hero.astro';
+import PlatformMap from '../components/home/PlatformMap.astro';
+import ProductCards from '../components/home/ProductCards.astro';
+import Section from '../components/home/Section.astro';
+import Steps from '../components/home/Steps.astro';
+import TermList from '../components/home/TermList.astro';
+import TextBlock from '../components/home/TextBlock.astro';
 import Base from '../layouts/Base.astro';
-import { getSite, getVisible } from '../lib/content';
+import { getPage, getSections, getSite, type Block } from '../lib/content';
+import type { BlockView } from '../lib/schemas';
 import { buildTitle } from '../lib/seo';
 
+const VIEWS: Record<BlockView, (props: { block: Block }) => unknown> = {
+  text: TextBlock,
+  cards: CardGrid,
+  steps: Steps,
+  list: TermList,
+  'platform-map': PlatformMap,
+  products: ProductCards,
+};
+
 const site = await getSite();
-const page = (await getVisible('pages')).find((entry) => entry.id === 'index');
-if (page === undefined) {
-  throw new Error('src/content/pages/index.md: нет видимой записи главной страницы');
-}
-const { title, description, draft, hero, ogImage } = page.data;
+const page = await getPage('index');
+const sections = await getSections(page);
+const { title, description, draft, ogImage } = page.data;
 ---
 
 <Base
@@ -21,59 +37,15 @@ const { title, description, draft, hero, ogImage } = page.data;
   ogImage={ogImage}
   brandScreen
 >
-  <section class="container stub">
-    {hero?.eyebrow && <p class="eyebrow">{hero.eyebrow}</p>}
-    <h1 class="stub__title">
-      <Logo variant="lockup" size={145} alt={site.name} />
-    </h1>
-    {hero?.lead && <p class="stub__lead">{hero.lead}</p>}
-    {hero?.accent && <p class="stub__accent">{hero.accent}</p>}
-    {hero?.note && <p class="stub__note">{hero.note}</p>}
-    <p class="stub__slogan">{site.slogan}</p>
-  </section>
+  <Hero page={page} site={site} />
+  {
+    sections.map((block) => {
+      const View = VIEWS[block.data.view];
+      return (
+        <Section block={block}>
+          <View block={block} />
+        </Section>
+      );
+    })
+  }
 </Base>
-
-<style>
-  .stub {
-    display: grid;
-    gap: var(--space-lg);
-    justify-items: start;
-    margin-block: auto;
-    padding-block: var(--space-section);
-  }
-
-  .stub > * {
-    max-width: var(--measure);
-  }
-
-  .stub__title {
-    --logo-height: var(--logo-hero-h);
-
-    margin-block-end: var(--space-xs);
-  }
-
-  .stub__lead {
-    font-size: var(--text-h3);
-    line-height: var(--leading-snug);
-  }
-
-  .stub__accent {
-    padding: var(--space-md) var(--space-lg);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-card);
-    background: var(--color-surface);
-  }
-
-  .stub__note {
-    color: var(--color-text-muted);
-    font-size: var(--text-small);
-  }
-
-  .stub__slogan {
-    color: var(--color-accent);
-    font-size: var(--text-h3);
-    font-weight: var(--font-weight-heavy);
-    line-height: var(--leading-snug);
-    letter-spacing: var(--letter-spacing-heading);
-  }
-</style>
