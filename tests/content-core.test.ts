@@ -370,6 +370,14 @@ describe('assertContentIntegrity: секции, маршруты, контакт
     ).not.toThrow();
   });
 
+  it('2: ссылка блока на 404 — исключение: pageHref дал бы /404/, а такого маршрута нет; на index — допустима', () => {
+    const linked = (id: string) => block('theses', { link: { page: { id }, label: 'Подробнее' } });
+    expect(check({ blocks: [linked('404'), team], pages: [...base.pages, page('404')] })).toThrow(
+      /theses\.md: ссылка на страницу «404» — у неё нет маршрута/,
+    );
+    expect(check({ blocks: [linked('index'), team] })).not.toThrow();
+  });
+
   it('3: блок повторяется в sections одной страницы — исключение; на разных страницах — допустимо', () => {
     expect(check({ pages: [home('theses', 'team', 'theses')] })).toThrow(/секция «theses» повторяется/);
     expect(check({ pages: [home('theses'), page('about', { sections: refs('theses') })] })).not.toThrow();
