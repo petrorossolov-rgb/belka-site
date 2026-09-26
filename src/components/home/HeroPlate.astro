@@ -1,0 +1,49 @@
+---
+// Плашка героя на всю ширину: lockup молочного тона как `h1` и слоган — как на OG-карточке.
+// Цвет — токен плашки, без фоновых растров (LCP — знак с `fetchpriority`). Всё, что в этом
+// файле, стоит на плашке: на рыжей плашке здесь только крупный текст, и contrast.test.ts
+// проверяет кегли этого файла. Остальной текст героя — под плашкой (`Hero.astro`).
+import Logo from '../Logo.astro';
+import type { Site } from '../../lib/content';
+
+interface Props {
+  site: Site;
+}
+
+const { site } = Astro.props;
+---
+
+<div class="hero-plate">
+  <div class="container hero-plate__inner">
+    <h1 class="hero-plate__title">
+      <Logo variant="lockup" size={145} alt={site.name} markTone="milk" tone="milk" priority />
+    </h1>
+    <p class="hero-plate__slogan">{site.slogan}</p>
+  </div>
+</div>
+
+<style>
+  .hero-plate {
+    background: var(--color-plate-bg);
+    color: var(--color-on-plate);
+  }
+
+  .hero-plate__inner {
+    display: grid;
+    gap: var(--space-lg);
+    justify-items: start;
+    padding-block: var(--space-section);
+  }
+
+  .hero-plate__title {
+    --logo-height: var(--logo-hero-h);
+  }
+
+  .hero-plate__slogan {
+    color: var(--color-plate-accent);
+    font-size: var(--text-h2);
+    font-weight: var(--font-weight-heavy);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--letter-spacing-heading);
+  }
+</style>

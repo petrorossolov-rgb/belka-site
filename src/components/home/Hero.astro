@@ -1,9 +1,8 @@
 ---
-// Герой главной: плашка на всю ширину (цвет — токен, без фоновых растров: LCP — знак или
-// текст), lockup молочного тона как `h1`. Тексты — `pages/index.md → hero` и `site.slogan`.
-// Каждый текстовый элемент задаёт кегль явно: при рыжей плашке мелкий текст на ней запрещён,
-// и contrast.test.ts проверяет кегли этого файла.
-import Logo from '../Logo.astro';
+// Герой главной: плашка со знаком и слоганом (`HeroPlate`) и под ней, на основном фоне, —
+// надзаголовок, лид, акцент и примечание из `pages/index.md → hero`. Мелкий текст на плашку
+// не ставится: при рыжей плашке его контраст ниже 4.5 (выбор владельца 2026-09-26, T14).
+import HeroPlate from './HeroPlate.astro';
 import type { Page, Site } from '../../lib/content';
 
 interface Props {
@@ -16,48 +15,29 @@ const hero = page.data.hero;
 ---
 
 <section class="hero">
-  <div class="container hero__inner">
-    {hero?.eyebrow && <p class="hero__eyebrow">{hero.eyebrow}</p>}
-    <h1 class="hero__title">
-      <Logo variant="lockup" size={145} alt={site.name} markTone="milk" tone="milk" priority />
-    </h1>
-    {hero?.lead && <p class="hero__lead">{hero.lead}</p>}
-    {hero?.accent && <p class="hero__accent">{hero.accent}</p>}
-    {hero?.note && <p class="hero__note">{hero.note}</p>}
-    <p class="hero__slogan">{site.slogan}</p>
-  </div>
+  <HeroPlate site={site} />
+  {
+    (hero?.eyebrow || hero?.lead || hero?.accent || hero?.note) && (
+      <div class="container hero__intro">
+        {hero?.eyebrow && <p class="eyebrow">{hero.eyebrow}</p>}
+        {hero?.lead && <p class="hero__lead">{hero.lead}</p>}
+        {hero?.accent && <p class="hero__accent">{hero.accent}</p>}
+        {hero?.note && <p class="hero__note">{hero.note}</p>}
+      </div>
+    )
+  }
 </section>
 
 <style>
-  .hero {
-    background: var(--color-plate-bg);
-    color: var(--color-on-plate);
-  }
-
-  .hero__inner {
+  .hero__intro {
     display: grid;
-    gap: var(--space-lg);
+    gap: var(--space-md);
     justify-items: start;
-    padding-block: var(--space-section);
+    padding-block: var(--space-section) 0;
   }
 
-  .hero__inner > * {
+  .hero__intro > * {
     max-width: var(--measure);
-  }
-
-  .hero__eyebrow {
-    color: var(--color-plate-muted);
-    font-family: var(--font-code);
-    font-size: var(--text-eyebrow);
-    font-weight: var(--font-weight-medium);
-    letter-spacing: var(--letter-spacing-caps);
-    text-transform: uppercase;
-  }
-
-  .hero__title {
-    --logo-height: var(--logo-hero-h);
-
-    margin-block-end: var(--space-xs);
   }
 
   .hero__lead {
@@ -66,20 +46,15 @@ const hero = page.data.hero;
   }
 
   .hero__accent {
-    font-size: var(--text-body);
+    padding: var(--space-md) var(--space-lg);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
     font-weight: var(--font-weight-bold);
   }
 
   .hero__note {
-    color: var(--color-plate-muted);
+    color: var(--color-text-muted);
     font-size: var(--text-small);
-  }
-
-  .hero__slogan {
-    color: var(--color-plate-accent);
-    font-size: var(--text-h3);
-    font-weight: var(--font-weight-heavy);
-    line-height: var(--leading-snug);
-    letter-spacing: var(--letter-spacing-heading);
   }
 </style>

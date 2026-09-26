@@ -130,7 +130,7 @@ describe('плашка героя: оба варианта маппинга', ()
   const LARGE_IF_BOLD = ['--text-h3'];
   const BOLD = /font-weight\s*:\s*var\(--font-weight-(bold|heavy)\)/;
 
-  /** Объявления `font-size` в `<style>` героя, которые дают мелкий текст на плашке. */
+  /** Объявления `font-size` в `<style>` компонента плашки, которые дают мелкий текст. */
   function smallTextOnPlate(astro: string): string[] {
     const styles = [...astro.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]!).join('\n');
     const small: string[] = [];
@@ -144,11 +144,12 @@ describe('плашка героя: оба варианта маппинга', ()
     return small;
   }
 
-  it('соглашение: при рыжей плашке в герое нет мелкого текста', () => {
-    const hero = new URL('../src/components/home/Hero.astro', import.meta.url);
-    // Героя до T11 нет — на странице нет и текста на плашке.
-    if (activePlate(theme) !== 'rust' || !existsSync(hero)) return;
-    expect(smallTextOnPlate(readFileSync(hero, 'utf8'))).toEqual([]);
+  // Всё, что стоит на плашке, живёт в HeroPlate.astro; остальной текст героя — под плашкой.
+  it('соглашение: при рыжей плашке на ней нет мелкого текста (HeroPlate.astro)', () => {
+    const plate = new URL('../src/components/home/HeroPlate.astro', import.meta.url);
+    if (activePlate(theme) !== 'rust') return;
+    expect(existsSync(plate), 'рыжая плашка без HeroPlate.astro — проверять нечего').toBe(true);
+    expect(smallTextOnPlate(readFileSync(plate, 'utf8'))).toEqual([]);
   });
 
   it('проба соглашения: мелкие кегли находятся, крупные — нет', () => {
