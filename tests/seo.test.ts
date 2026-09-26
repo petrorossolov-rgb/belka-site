@@ -53,9 +53,22 @@ describe('productTitle', () => {
     );
   });
 
-  it('иначе имя продукта', () => {
+  it('без seo.title и descriptor — имя продукта', () => {
     expect(productTitle({ name: 'Belka WMS' })).toBe('Belka WMS');
     expect(productTitle({ name: 'Belka WMS', seo: {} })).toBe('Belka WMS');
+  });
+
+  it('с descriptor — «имя — пояснение» через тире с пробелами', () => {
+    expect(productTitle({ name: 'Belka WMS', descriptor: 'система управления складом' })).toBe(
+      'Belka WMS — система управления складом',
+    );
+    expect(productTitle({ name: 'Belka WMS', descriptor: 'пояснение', seo: {} })).toBe('Belka WMS — пояснение');
+  });
+
+  it('seo.title важнее пояснения', () => {
+    expect(productTitle({ name: 'Belka WMS', descriptor: 'пояснение', seo: { title: 'Свой заголовок' } })).toBe(
+      'Свой заголовок',
+    );
   });
 });
 
