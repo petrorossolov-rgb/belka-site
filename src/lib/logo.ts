@@ -16,7 +16,7 @@ export interface LogoLayout {
   wordmark?: Box;
 }
 
-/** Исходные размеры mark-rust.png. */
+/** Исходные размеры mark-rust.png и mark-milk.png (одна геометрия на оба тона — logo.test.ts). */
 export const MARK_SOURCE: Box = { width: 450, height: 537 };
 /** Исходные размеры wordmark-latin-*.png. */
 export const WORDMARK_SOURCE: Box = { width: 707, height: 137 };

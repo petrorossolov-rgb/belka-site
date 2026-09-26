@@ -57,8 +57,26 @@ describe('растры знака', () => {
     }
   });
 
+  /** Ширина и высота PNG из заголовка IHDR. */
+  const pngSize = (file: string) => {
+    const bytes = readFileSync(new URL(file, BRAND));
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  };
+
+  it('знак обоих тонов — одной геометрии MARK_SOURCE: logoLayout не зависит от тона', () => {
+    expect(pngSize('mark-rust.png')).toEqual(MARK_SOURCE);
+    expect(pngSize('mark-milk.png')).toEqual(MARK_SOURCE);
+  });
+
+  it('словесный знак всех тонов — геометрии WORDMARK_SOURCE', () => {
+    for (const tone of ['bark', 'milk', 'rust']) {
+      expect(pngSize(`wordmark-latin-${tone}.png`), tone).toEqual(WORDMARK_SOURCE);
+    }
+  });
+
   it('только знак и латинский словесный знак «Belka SCM»', () => {
     expect(files.sort()).toEqual([
+      'mark-milk.png',
       'mark-rust.png',
       'wordmark-latin-bark.png',
       'wordmark-latin-milk.png',
