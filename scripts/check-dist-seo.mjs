@@ -3,18 +3,26 @@
 //
 //   node scripts/check-dist-seo.mjs <production|staging> [--dist dist] [--out draft-routes.json]
 //
-// production — есть sitemap без 404 и черновиков, robots разрешает индексацию, нет noindex и data-draft.
+// production — есть sitemap без 404 и черновиков, robots разрешает индексацию, нет noindex,
+//              data-draft и черновых блоков (data-draft-block).
 // staging    — нет sitemap, robots `Disallow: /`, noindex на каждой HTML-странице.
 // Оба        — ресурсы только со своего хоста (Constitution 4), preload шрифтов только у основной
-//              гарнитуры (--font-sans), никаких <script>, кроме JSON-LD.
+//              гарнитуры (--font-sans), никаких <script>, кроме JSON-LD; og:image, если есть, —
+//              PNG из этой сборки с размерами как в og:image:width|height, не больше 300 КБ,
+//              с непустым og:image:alt.
 // Пишет draft-routes.json — маршруты страниц с data-draft (для смоука T17, в dist/ не попадает).
 // Код 1 — нарушения, код 2 — ошибка вызова.
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const PRODUCTION_ORIGIN = 'https://belkascm.ru';
 const ENVS = ['production', 'staging'];
+
+/** Предел веса картинки превью: карточку с картинкой тяжелее 300 КБ WhatsApp не показывает. */
+export const OG_IMAGE_MAX_BYTES = 300 * 1024;
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 // rel ссылок, по которым браузер сам что-то загружает или к чему подключается.
 const RESOURCE_RELS = new Set([
@@ -48,13 +56,37 @@ export function parseTags(/** @type {string} */ html, /** @type {string[]} */ na
   const tags = [];
   const tagRe = new RegExp(`<(${names.join('|')})\\b([^>]*)>`, 'gi');
   for (const [, name = '', rawAttrs = ''] of html.matchAll(tagRe)) {
-    const attrs = new Map();
-    for (const m of rawAttrs.matchAll(/([^\s=/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) {
-      attrs.set((m[1] ?? '').toLowerCase(), m[2] ?? m[3] ?? m[4] ?? '');
-    }
-    tags.push({ name: name.toLowerCase(), attrs });
+    tags.push({ name: name.toLowerCase(), attrs: parseAttrs(rawAttrs) });
   }
   return tags;
+}
+
+/** Атрибуты открывающего тега: имена в нижнем регистре, у атрибута без значения — пустая строка. */
+function parseAttrs(/** @type {string} */ rawAttrs) {
+  /** @type {Map<string, string>} */
+  const attrs = new Map();
+  for (const m of rawAttrs.matchAll(/([^\s=/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) {
+    attrs.set((m[1] ?? '').toLowerCase(), m[2] ?? m[3] ?? m[4] ?? '');
+  }
+  return attrs;
+}
+
+/** Открывающие теги любых элементов с атрибутом `attr`. */
+function tagsWithAttr(/** @type {string} */ html, /** @type {string} */ attr) {
+  /** @type {Tag[]} */
+  const tags = [];
+  for (const [, name = '', rawAttrs = ''] of html.matchAll(/<([a-z][a-z0-9-]*)\b([^>]*)>/gi)) {
+    const attrs = parseAttrs(rawAttrs);
+    if (attrs.has(attr)) tags.push({ name: name.toLowerCase(), attrs });
+  }
+  return tags;
+}
+
+/** Ширина и высота PNG из заголовка IHDR (байты 16–23); не PNG — `undefined`. */
+export function pngSize(/** @type {Buffer} */ bytes) {
+  if (bytes.length < 24 || !bytes.subarray(0, 8).equals(PNG_SIGNATURE)) return undefined;
+  if (bytes.toString('latin1', 12, 16) !== 'IHDR') return undefined;
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
 /** Абсолютный адрес с хостом (`https://…`, `//…`) — внешний ресурс. */
@@ -132,9 +164,17 @@ export function checkDistSeo({ distDir, env }) {
     );
     if (production && noindex) errors.push(`${file}: noindex в прод-сборке`);
     if (production && draft) errors.push(`${file}: черновая страница (data-draft) в прод-сборке`);
+    if (production) {
+      for (const tag of tagsWithAttr(html, 'data-draft-block')) {
+        const id = tag.attrs.get('data-draft-block');
+        const marker = `<${tag.name} data-draft-block${id ? `="${id}"` : ''}>`;
+        errors.push(`${file}: черновой блок ${marker} в прод-сборке (маршрут ${routeOf(file)})`);
+      }
+    }
     if (!production && !noindex) errors.push(`${file}: нет <meta name="robots" content="noindex, nofollow">`);
 
     errors.push(...checkPageInvariants(file, html));
+    errors.push(...checkOgImage(file, html, distDir));
   }
 
   for (const file of files.filter((f) => f.endsWith('.css'))) {
@@ -190,6 +230,55 @@ function checkPageInvariants(/** @type {string} */ file, /** @type {string} */ h
   }
   for (const css of inlineStyles(html)) {
     for (const url of cssUrls(css)) external('url() во встроенном стиле', url);
+  }
+  return errors;
+}
+
+/**
+ * Картинка превью, если она есть: PNG из этой сборки (адрес — от прод-домена, как canonical),
+ * размеры совпадают с og:image:width|height, вес не больше OG_IMAGE_MAX_BYTES, alt непустой.
+ * Страница без og:image проходит: правило не требует картинку.
+ */
+function checkOgImage(/** @type {string} */ file, /** @type {string} */ html, /** @type {string} */ distDir) {
+  /** @type {Map<string, string[]>} */
+  const og = new Map();
+  for (const { attrs } of parseTags(html, ['meta'])) {
+    const property = attrs.get('property') ?? '';
+    if (property.startsWith('og:image')) og.set(property, [...(og.get(property) ?? []), attrs.get('content') ?? '']);
+  }
+  const images = og.get('og:image') ?? [];
+  if (images.length === 0) return [];
+
+  /** @type {string[]} */
+  const errors = [];
+  const first = (/** @type {string} */ key) => og.get(key)?.[0];
+  if (images.length > 1) errors.push(`${file}: og:image встречается ${images.length} раза — нужен один`);
+  if (!first('og:image:alt')?.trim()) errors.push(`${file}: у og:image нет непустого og:image:alt`);
+  const width = first('og:image:width');
+  const height = first('og:image:height');
+  if (width === undefined) errors.push(`${file}: у og:image нет og:image:width`);
+  if (height === undefined) errors.push(`${file}: у og:image нет og:image:height`);
+
+  const image = images[0] ?? '';
+  const target = localFile(image, errors, `${file}: og:image`);
+  if (target === undefined) return errors;
+  const path = join(distDir, target);
+  if (!existsSync(path) || !statSync(path).isFile()) {
+    errors.push(`${file}: og:image ${image} — файла ${target} нет в сборке`);
+    return errors;
+  }
+  const bytes = statSync(path).size;
+  if (bytes > OG_IMAGE_MAX_BYTES) {
+    errors.push(`${file}: og:image ${target} — ${bytes} байт, предел ${OG_IMAGE_MAX_BYTES}`);
+  }
+  const size = pngSize(readFileSync(path));
+  if (size === undefined) {
+    errors.push(`${file}: og:image ${target} — не PNG, размеры не проверить`);
+  } else if (
+    (width !== undefined && String(size.width) !== width.trim()) ||
+    (height !== undefined && String(size.height) !== height.trim())
+  ) {
+    errors.push(`${file}: og:image ${target} — ${size.width}×${size.height}, в разметке ${width ?? '?'}×${height ?? '?'}`);
   }
   return errors;
 }
