@@ -30,10 +30,16 @@ const { title, description, draft, hero, ogImage } = page.data;
     {hero?.accent && <p class="stub__accent">{hero.accent}</p>}
     {hero?.note && <p class="stub__note">{hero.note}</p>}
     <p class="stub__slogan">{site.slogan}</p>
+    <div class="probe-wide"></div>
   </section>
 </Base>
 
 <style>
+  .probe-wide {
+    width: 120vw;
+    min-height: var(--space-md);
+  }
+
   .stub {
     display: grid;
     gap: var(--space-lg);
