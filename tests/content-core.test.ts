@@ -416,6 +416,9 @@ describe('assertContentIntegrity: секции, маршруты, контакт
       /products\/wms\.md: id «products\/wms» занимает маршрут страниц продуктов/,
     );
     expect(check({ pages: [...base.pages, page('products-overview')] })).not.toThrow();
+    // Хаб /products/ (ep03) — страница `products`: маршрут `[...slug]`, не `products/[id]`.
+    expect(check({ pages: [...base.pages, page('products')] })).not.toThrow();
+    expect(check({ pages: [...base.pages, page('products/x')] })).toThrow(/products\/x\.md: id «products\/x» занимает маршрут/);
   });
 
   it('6: у 404 нет nav, sections и draft', () => {
