@@ -34,6 +34,7 @@ function rect(over: Partial<Rect> = {}): Rect {
   return {
     selector: 'div',
     parent: -1,
+    left: 0,
     right: 100,
     width: 100,
     height: 20,
@@ -136,6 +137,25 @@ describe('check-layout: findOverflow', () => {
     expect(check([{ ...srOnly, overflowX: 'visible', clipped: false }])).toHaveLength(1);
   });
 
+  it('левая граница за краем окна падает: дробная доля пикселя — нет, 1 px — да', () => {
+    expect(check([rect({ left: -0.4 })])).toEqual([]);
+    expect(check([rect({ selector: 'div.block', left: -0.6 })])).toEqual([
+      { selector: 'div.block', reason: 'левая граница -0.6px за левым краем окна' },
+    ]);
+  });
+
+  it('левая граница: потомок умещающегося контейнера прокрутки проходит, контейнер левее окна — нет', () => {
+    const scroller = rect({ selector: 'div.scroll', right: 360, width: 360, scrollWidth: 800, clientWidth: 360, overflowX: 'auto' });
+    const child = rect({ selector: 'div.item', parent: 0, left: -200, right: 100, width: 300 });
+    expect(check([scroller, child])).toEqual([]);
+    expect(check([{ ...scroller, left: -1 }, child]).map((o) => o.selector)).toEqual(['div.scroll', 'div.item']);
+  });
+
+  it('visually-hidden за левым краем не проверяется', () => {
+    const srOnly = rect({ selector: 'span.sr-only', left: -9999, right: -9998, width: 1, height: 1, scrollWidth: 1, clientWidth: 1, overflowX: 'hidden', clipped: true });
+    expect(check([srOnly])).toEqual([]);
+  });
+
   it('строчные элементы (scrollWidth и clientWidth = 0): проверяется правая граница', () => {
     expect(check([rect({ scrollWidth: 0, clientWidth: 0, right: 200 })])).toEqual([]);
     expect(check([rect({ scrollWidth: 0, clientWidth: 0, right: 400 })])).toHaveLength(1);
@@ -213,11 +233,11 @@ describe('check-layout: фикстуры в Chrome', () => {
   const failing = () => [...new Set(result.errors.map((e) => e.split(' ')[0]))];
 
   it('проверены все HTML, включая /404.html', () => {
-    expect(result.pages).toBe(9);
+    expect(result.pages).toBe(10);
   });
 
-  it('падают ровно пробы: 361px, 361px под html/body и обёрткой overflow-x: hidden, длинное слово, absolute за краем', () => {
-    expect(failing()).toEqual(['/absolute/', '/body-hidden/', '/long-word-hidden/', '/long-word/', '/wide/', '/wrapper-hidden/']);
+  it('падают ровно пробы: 361px, 361px под html/body и обёрткой overflow-x: hidden, длинное слово, absolute за краем, 1px за левым краем', () => {
+    expect(failing()).toEqual(['/absolute/', '/body-hidden/', '/left-hidden/', '/long-word-hidden/', '/long-word/', '/wide/', '/wrapper-hidden/']);
   });
 
   it('проходят: ровно 360px, visually-hidden, скрытые (в том числе visibility: hidden с обрезанным словом), таблица 800px в overflow-x: auto, 404', () => {
@@ -228,6 +248,7 @@ describe('check-layout: фикстуры в Chrome', () => {
     expect(result.errors).toContain('/wide/ @360: div.block — правая граница 361px за окном 360px');
     expect(result.errors).toContain('/body-hidden/ @360: div.block — правая граница 361px за окном 360px');
     expect(result.errors).toContain('/wrapper-hidden/ @360: div.wrapper > div.block — правая граница 361px за окном 360px');
+    expect(result.errors).toContain('/left-hidden/ @360: div.wrapper > div.block — левая граница -1px за левым краем окна');
     expect(result.errors.some((e) => e.startsWith('/long-word/ @360: div.card > p — содержимое шире бокса, вылезает'))).toBe(true);
     expect(result.errors.some((e) => e.startsWith('/long-word-hidden/ @360: div.card > p — содержимое шире бокса'))).toBe(true);
     expect(result.errors).toContain('/absolute/ @360: div.badge — правая граница 380px за окном 360px');
