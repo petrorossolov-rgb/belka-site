@@ -4,7 +4,7 @@ short: YMS
 domain: yard
 kind: platform
 mapOrder: 3
-summary: "Заглушка ep01: описание ещё не утверждено."
+summary: "Система управления двором: транспорт на территории склада и загрузка ворот."
 readiness: planned  # скрыто: выводится только при site.flags.showReadiness
 ---
 

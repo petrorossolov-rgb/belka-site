@@ -4,7 +4,7 @@ short: Labor
 domain: labor
 kind: platform
 mapOrder: 8
-summary: "Заглушка ep01: описание ещё не утверждено."
+summary: "Производительность сотрудников: выработка, нормативы и показатели смены по данным о каждой операции."
 readiness: planned  # скрыто: выводится только при site.flags.showReadiness
 ---
 
