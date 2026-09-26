@@ -47,6 +47,8 @@
 ## Docs Debt
 <!-- Items logged by /my-execute, /my-change, /my-incident. Resolved by /my-sync-docs. -->
 
+- [ ] 2026-09-26 Обновить plan ep02 → «Контракт `src/lib/content.ts`», Data Model и B5 по T07–T11. `renderBlock(block)` — тело блока для компонентов (компоненты не импортируют `astro:content`, тест доступа). `getProductPages(products, env)` и `resolveSections` — в ядре. Правило целостности 2 действует и на черновые страницы. Плашка — маппинг из четырёх токенов, добавлен `--color-plate-accent` (слоган, крупный текст); токены `--section-gap`, `--card-min`, `--term-min`, `--map-columns-*`, `--step-number-size`.
+
 - [ ] 2026-09-26 Обновить plan ep02 → Data Model `block` и B1 по реализации T06. Пункты бывают только у `cards`/`steps`/`list`: у `text` пунктов тоже нет (в плане — только у `platform-map`/`products`), иначе они молча не выводятся. `items` по умолчанию `[]`. `link.page` и `sections` заданы в фабриках `blockSchema(reference)`/`pageSchema(image, reference)`, а не `.extend` в `content.config.ts` (Zod 4 и refine). Лимиты: `headingMax`, `eyebrowMax`, `leadMax`, `linkLabelMax`, `altMax`; у новых строк `min(1)`.
 
 - [ ] 2026-09-25 Обновить plan ep02 → «Контракт `check-voice`» по реализации T02. V2: „лапки“ вне «ёлочек» — тоже ошибка. V6: падежные формы («лучшая на рынке», «лидером рынка», «кликните»). V7: строчная «белка» перед латиницей, дефис («Белка-WMS»), кириллическая аббревиатура вместо «УЦП». Служебные `og:image:*` (кроме `og:image:alt`) и `og:locale:alternate` не проверяются. Пустая сборка — нарушение. `--text`: одна строка — один абзац, незакрытый блок — нарушение.
