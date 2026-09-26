@@ -311,6 +311,8 @@ export function assertContentIntegrity({
     const link = block.data.link;
     if (link !== undefined && !pageIds.has(link.page.id)) {
       errors.push(`${source(block)}: ссылка на страницу «${link.page.id}», которой нет в src/content/pages`);
+    } else if (link?.page.id === '404') {
+      errors.push(`${source(block)}: ссылка на страницу «404» — у неё нет маршрута /404/, сервер отдаёт её на любой неизвестный адрес`);
     }
     const hasBody = (block.body ?? '').trim() !== '';
     if (block.data.view === 'text' && !hasBody) {
