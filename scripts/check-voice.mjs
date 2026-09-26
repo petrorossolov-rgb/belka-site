@@ -7,7 +7,8 @@
 // Правила V1–V10 — контракт check-voice из плана ep02. Смысл и факты линтер не проверяет: это
 // цикл ревью текстов (Codex и владелец), правило «не упоминать X» в публичном коде раскрыло бы X.
 // Исключение — только атрибутом data-voice="raw" в разметке: снимает V3, V4, V10 в поддереве,
-// остальные правила действуют и внутри. V9 — только production и --text.
+// остальные правила действуют и внутри. Строки JSON-LD проверяются как метаданные, кроме служебных
+// ключей (адреса, типы, контакты). V9 — только production и --text.
 // Код 1 — нарушения, код 2 — ошибка вызова.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
@@ -21,7 +22,7 @@ import { routeOf } from './check-dist-seo.mjs';
  * @typedef {{ rule: string, index: number, length: number, message: string }} Hit
  * @typedef {{ id: string, rawExempt: boolean, productionOnly: boolean, find: (text: string) => Hit[] }} Rule
  * @typedef {{ env?: string, raw?: boolean[] }} TextContext
- * @typedef {{ text: string, raw: boolean[], where: string }} Segment
+ * @typedef {{ text: string, raw: boolean[], where: string, error?: string }} Segment
  */
 
 const ENVS = ['production', 'staging'];
@@ -173,6 +174,12 @@ const INLINE = new Set([
 // Невидимое или не-текст: содержимое не проверяется (`<code>` внутри строки — заменяется знаком-заполнителем).
 const SKIP = new Set(['script', 'style', 'code', 'pre', 'template', 'noscript', 'textarea']);
 const TEXT_ATTRS = ['alt', 'aria-label', 'title'];
+// JSON-LD — метаданные для поисковиков и мессенджеров (runbook текстов): строки проверяются, кроме
+// служебных ключей — адресов, типов, идентификаторов и контактов.
+const JSON_LD_TYPE = 'application/ld+json';
+const JSON_LD_NOT_TEXT = new Set([
+  '@context', '@type', '@id', 'url', 'logo', 'image', 'sameAs', 'email', 'telephone', 'contentUrl',
+]);
 // Служебные og-свойства: адреса, типы, размеры — не текст.
 const OG_NOT_TEXT = new Set([
   'og:url', 'og:image', 'og:image:url', 'og:image:secure_url', 'og:image:type', 'og:image:width',
@@ -207,6 +214,30 @@ function normalize(/** @type {{ ch: string, raw: boolean }[]} */ chars) {
 function attrSegment(/** @type {string} */ value, /** @type {boolean} */ raw, /** @type {string} */ where) {
   const { text, raw: mask } = normalize(value.split('').map((ch) => ({ ch, raw })));
   return text ? [{ text, raw: mask, where }] : [];
+}
+
+/** Строки JSON-LD как отдельные блоки; `where` — путь ключа. Невалидный JSON — нарушение, а не пропуск. */
+function jsonLdSegments(/** @type {string} */ source, /** @type {boolean} */ raw) {
+  let data;
+  try {
+    data = JSON.parse(source);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return [{ text: '', raw: [], where: '<script ld+json>', error: `JSON-LD не разбирается: ${message}` }];
+  }
+  /** @type {Segment[]} */
+  const segments = [];
+  const visit = (/** @type {unknown} */ value, /** @type {string} */ path) => {
+    if (typeof value === 'string') segments.push(...attrSegment(value, raw, `<script ld+json ${path}>`));
+    else if (Array.isArray(value)) value.forEach((item, i) => visit(item, `${path}[${i}]`));
+    else if (value !== null && typeof value === 'object') {
+      for (const [key, item] of Object.entries(value)) {
+        if (!JSON_LD_NOT_TEXT.has(key)) visit(item, path ? `${path}.${key}` : key);
+      }
+    }
+  };
+  visit(data, '');
+  return segments;
 }
 
 function attributeSegments(/** @type {Element} */ el, /** @type {Map<string, string>} */ attrs, /** @type {boolean} */ raw) {
@@ -253,6 +284,11 @@ export function collectSegments(html) {
       const attrs = new Map(child.attrs.map((a) => [a.name, a.value]));
       const inline = INLINE.has(child.tagName);
       const elRaw = raw || attrs.get('data-voice') === 'raw';
+      if (child.tagName === 'script' && (attrs.get('type') ?? '').trim().toLowerCase() === JSON_LD_TYPE) {
+        flush();
+        segments.push(...jsonLdSegments(child.childNodes.map((n) => ('value' in n ? n.value : '')).join(''), elRaw));
+        continue;
+      }
       if (attrs.has('hidden') || SKIP.has(child.tagName)) {
         if (inline || child.tagName === 'code') buffer.push({ ch: PLACEHOLDER, raw: elRaw });
         else flush();
@@ -280,8 +316,9 @@ export function collectSegments(html) {
  * @returns {string[]} нарушения «маршрут: [где] правило сообщение — «цитата»»
  */
 export function checkHtml(html, { env, route }) {
-  return collectSegments(html).flatMap((segment) =>
-    checkText(segment.text, { env, raw: segment.raw }).map(
+  return collectSegments(html).flatMap((segment) => segment.error !== undefined
+    ? [`${route}: ${segment.where} ${segment.error}`]
+    : checkText(segment.text, { env, raw: segment.raw }).map(
       (hit) => `${route}: ${segment.where ? `${segment.where} ` : ''}${hit.rule} ${hit.message} — «${quote(segment.text, hit)}»`,
     ),
   );
