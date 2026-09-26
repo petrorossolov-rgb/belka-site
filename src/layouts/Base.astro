@@ -22,9 +22,11 @@ interface Props {
   canonical?: boolean;
   /** Картинка превью (`page.ogImage`); иначе `site.seo.defaultOgImage`. */
   ogImage?: ImageMetadata | undefined;
+  /** Alt картинки превью страницы (`page.ogImageAlt`). */
+  ogImageAlt?: string | undefined;
 }
 
-const { title, description, draft = false, brandScreen = false, canonical = true, ogImage } = Astro.props;
+const { title, description, draft = false, brandScreen = false, canonical = true, ogImage, ogImageAlt } = Astro.props;
 ---
 
 <!doctype html>
@@ -32,7 +34,7 @@ const { title, description, draft = false, brandScreen = false, canonical = true
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <Seo title={title} description={description} canonical={canonical} ogImage={ogImage} />
+    <Seo title={title} description={description} canonical={canonical} ogImage={ogImage} ogImageAlt={ogImageAlt} />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <Font cssVariable="--font-sans" preload />

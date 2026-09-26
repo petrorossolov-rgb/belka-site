@@ -115,6 +115,15 @@
   --logo-header-h: 2rem;                                        /* 32 */
   --logo-hero-h: clamp(5.25rem, 4rem + 5.5556vw, 9rem);         /* 84 → 144: lockup 292 → 500 в ширину */
 
+  /* OG-карточка 1200×630 (scripts/og-template.html → npm run build:og): плашка героя,
+     молочный lockup и слоган. Размеры — в CSS px карточки, масштаб 1. */
+  --og-width: 75rem;                                            /* 1200 */
+  --og-height: 39.375rem;                                       /* 630 */
+  --og-padding: 5rem;                                           /* 80 */
+  --og-gap: 3rem;                                               /* 48: lockup → слоган */
+  --og-logo-h: 9rem;                                            /* 144: высота знака */
+  --og-slogan-size: 4rem;                                       /* 64 */
+
   /* Движение */
   --motion-duration-fast: var(--dur-fast);
   --motion-duration-base: var(--dur-base);

@@ -27,7 +27,7 @@ const VIEWS: Record<BlockView, (props: { block: Block }) => unknown> = {
 const site = await getSite();
 const page = await getPage('index');
 const sections = await getSections(page);
-const { title, description, draft, ogImage } = page.data;
+const { title, description, draft, ogImage, ogImageAlt } = page.data;
 ---
 
 <Base
@@ -35,6 +35,7 @@ const { title, description, draft, ogImage } = page.data;
   description={description}
   draft={draft}
   ogImage={ogImage}
+  ogImageAlt={ogImageAlt}
   brandScreen
 >
   <Hero page={page} site={site} />

@@ -20,10 +20,10 @@ interface Props {
 const { page } = Astro.props;
 const site = await getSite();
 const { Content } = await render(page);
-const { title, description, draft, hero, ogImage } = page.data;
+const { title, description, draft, hero, ogImage, ogImageAlt } = page.data;
 ---
 
-<Base title={buildTitle(title, site.name)} description={description} draft={draft} ogImage={ogImage}>
+<Base title={buildTitle(title, site.name)} description={description} draft={draft} ogImage={ogImage} ogImageAlt={ogImageAlt}>
   <article class="container page">
     {hero?.eyebrow && <p class="eyebrow">{hero.eyebrow}</p>}
     <h1>{title}</h1>

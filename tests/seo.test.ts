@@ -4,6 +4,7 @@ import {
   buildTitle,
   canonicalUrl,
   organizationJsonLd,
+  previewImage,
   productTitle,
   serializeJsonLd,
   socialMeta,
@@ -116,14 +117,56 @@ describe('socialMeta', () => {
     expect(metaContent(tags, 'twitter:card')).toBe('summary');
   });
 
+  const image = { url: 'https://belkascm.ru/_astro/og.png', width: 1200, height: 630, alt: 'Belka SCM. Знает, где что лежит.' };
+
   it('есть картинка → og:image абсолютным URL, карточка `summary_large_image`', () => {
-    const tags = socialMeta({ ...base, image: 'https://belkascm.ru/_astro/og.png' });
+    const tags = socialMeta({ ...base, image });
     expect(metaContent(tags, 'og:image')).toBe('https://belkascm.ru/_astro/og.png');
     expect(metaContent(tags, 'twitter:card')).toBe('summary_large_image');
   });
 
+  it('размеры и alt картинки — сразу после og:image, в этом порядке', () => {
+    const keys = socialMeta({ ...base, image }).map((t) => t.key);
+    const at = keys.indexOf('og:image');
+    expect(keys.slice(at, at + 4)).toEqual(['og:image', 'og:image:width', 'og:image:height', 'og:image:alt']);
+    const tags = socialMeta({ ...base, image });
+    expect(metaContent(tags, 'og:image:width')).toBe('1200');
+    expect(metaContent(tags, 'og:image:height')).toBe('630');
+    expect(metaContent(tags, 'og:image:alt')).toBe(image.alt);
+  });
+
+  it('без картинки нет ни одного og:image:*', () => {
+    expect(socialMeta(base).some((t) => t.key.startsWith('og:image'))).toBe(false);
+  });
+
   it('страница без адреса (404) → без og:url', () => {
     expect(socialMeta(base).some((t) => t.key === 'og:url')).toBe(false);
+  });
+});
+
+describe('previewImage', () => {
+  const site = { image: 'site.png', alt: 'Alt сайта' };
+
+  it('своя картинка страницы — со своим alt, не с alt сайта', () => {
+    expect(previewImage({ image: 'page.png', alt: 'Alt страницы' }, site)).toEqual({
+      image: 'page.png',
+      alt: 'Alt страницы',
+    });
+  });
+
+  it('у страницы нет картинки → картинка и alt сайта', () => {
+    expect(previewImage({}, site)).toEqual({ image: 'site.png', alt: 'Alt сайта' });
+    expect(previewImage({ alt: 'Alt без картинки' }, site)).toEqual({ image: 'site.png', alt: 'Alt сайта' });
+  });
+
+  it('нет ни одной картинки → без превью', () => {
+    expect(previewImage({}, {})).toBeUndefined();
+    expect(previewImage({}, { alt: 'Alt без картинки' })).toBeUndefined();
+  });
+
+  it('граничный случай: картинка страницы без alt → ошибка, alt сайта не подставляется', () => {
+    expect(() => previewImage({ image: 'page.png' }, site)).toThrow(/страницы нет alt/);
+    expect(() => previewImage({}, { image: 'site.png' })).toThrow(/сайта нет alt/);
   });
 });
 
