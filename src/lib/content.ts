@@ -17,6 +17,7 @@ export type Product = CollectionEntry<'products'>;
 export type Page = CollectionEntry<'pages'>;
 export type Block = CollectionEntry<'blocks'>;
 export type Case = CollectionEntry<'cases'>;
+export type Mockup = CollectionEntry<'mockups'>;
 export type Site = CollectionEntry<'site'>['data'];
 
 let integrity: Promise<void> | undefined;
@@ -40,9 +41,10 @@ function ensureIntegrity(): Promise<void> {
     getCollection('pages'),
     getCollection('cases'),
     getCollection('blocks'),
+    getCollection('mockups'),
     readSite(),
-  ]).then(([products, pages, cases, blocks, site]) =>
-    core.assertContentIntegrity({ products, pages, cases, blocks, site }),
+  ]).then(([products, pages, cases, blocks, mockups, site]) =>
+    core.assertContentIntegrity({ products, pages, cases, blocks, mockups, site }),
   );
   return integrity;
 }
@@ -71,6 +73,31 @@ export async function getPage(id: string): Promise<Page> {
 export async function getSections(page: Page): Promise<Block[]> {
   await ensureIntegrity();
   return core.resolveSections(page, await getCollection('blocks'), SITE_ENV);
+}
+
+/** Видимый продукт по id; нет такого — ошибка сборки. */
+export async function getProduct(id: string): Promise<Product> {
+  const product = (await getVisible('products')).find((entry) => entry.id === id);
+  if (product === undefined) {
+    throw new Error(`src/content/products/${id}.md: нет видимой записи продукта`);
+  }
+  return product;
+}
+
+/** Секции страницы продукта в порядке `sections`; в production черновые блоки исключены. */
+export async function getProductSections(product: Product): Promise<Block[]> {
+  await ensureIntegrity();
+  return core.resolveSections(product, await getCollection('blocks'), SITE_ENV);
+}
+
+/** Мокап по ссылке пункта `surfaces`; нет такого — ошибка сборки (целостность ловит раньше). */
+export async function getMockup(ref: { id: string }): Promise<Mockup> {
+  await ensureIntegrity();
+  const mockup = await getEntry('mockups', ref.id);
+  if (mockup === undefined) {
+    throw new Error(`src/content/mockups/${ref.id}.yaml: нет записи мокапа`);
+  }
+  return mockup;
 }
 
 /**
