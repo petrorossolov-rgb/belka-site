@@ -1,7 +1,9 @@
 # Глобальные настройки сайта. Одна запись `site` (лоадер `file`).
-# nameRu не заполняется до решения ep02; contacts, legal, metrika, seo — пусто до ep02 и ep05.
+# nameRu — русская редакция имени, утверждена владельцем (Constitution 3); contacts, legal,
+# metrika — пусто до ep05, seo — до OG-карточки ep02.
 site:
   name: Belka SCM
+  nameRu: Белка УЦП
   slogan: Знает, где что лежит.
   url: https://belkascm.ru
   contacts: {}

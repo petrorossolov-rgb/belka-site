@@ -1,6 +1,7 @@
 ---
 // Минимальная страница продукта (ep01): имя, `short`, тело Markdown. Маршруты — только
-// продукты с `hasPage`, видимые в текущем окружении; полный шаблон — ep03.
+// продукты с `hasPage`, видимые в текущем окружении; черновая страница (`draft` продукта
+// или `pageDraft`) — с маркером и плашкой. Полный шаблон — ep03.
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import { getProductPages, getSite, type Product } from '../../lib/content';
@@ -18,10 +19,10 @@ interface Props {
 const { product } = Astro.props;
 const site = await getSite();
 const { Content } = await render(product);
-const { name, short, summary, seo, draft } = product.data;
+const { name, short, summary, seo, draft, pageDraft } = product.data;
 ---
 
-<Base title={buildTitle(productTitle(product.data), site.name)} description={seo?.description ?? summary} draft={draft}>
+<Base title={buildTitle(productTitle(product.data), site.name)} description={seo?.description ?? summary} draft={draft || pageDraft}>
   <article class="container product">
     <p class="eyebrow">{short}</p>
     <h1>{name}</h1>
