@@ -86,8 +86,39 @@ describe('check-voice: сбор текста', () => {
     expect(segment?.text).toBe('1\u2009284 и 1\u202F284 и 1\u00A0284');
   });
 
-  it('script, style, code, pre, template, noscript и hidden не проверяются', () => {
+  it('script (кроме JSON-LD), style, code, pre, template, noscript и hidden не проверяются', () => {
     expect(rules('<script>"!"</script><style>a::after{content:"!"}</style><pre>!</pre><template><p>!</p></template><noscript>!</noscript><p hidden>!</p><p>Склад <code>!</code> готов.</p><div hidden><img alt="!"></div>')).toEqual([]);
+  });
+
+  it('JSON-LD: текстовые строки проверяются с путём ключа, служебные ключи — нет', () => {
+    const ld = JSON.stringify({
+      '@context': 'https://schema.org!',
+      '@type': 'Organization!',
+      name: 'Belka SCM',
+      alternateName: 'Белка SCM',
+      description: 'Склад под ключ',
+      url: 'https://belkascm.ru/!',
+      logo: 'https://belkascm.ru/a!.png',
+      contactPoint: { '@type': 'ContactPoint', email: 'a!@b.ru', areaServed: ['Склад!'] },
+    });
+    const errors = checkHtml(page('<p>Склад</p>', `<title>Склад</title><script type="application/ld+json">${ld}</script>`), { env: 'production', route: '/' });
+    expect(errors.map((e) => /^\/: (<[^>]+>) (V\d+)/.exec(e)?.slice(1).join(' ') ?? e)).toEqual([
+      '<script ld+json alternateName> V7',
+      '<script ld+json description> V6',
+      '<script ld+json contactPoint.areaServed[0]> V1',
+    ]);
+  });
+
+  it('JSON-LD: тип без учёта регистра; заглушка падает в production и проходит в staging', () => {
+    const head = '<title>Склад</title><script type="Application/LD+JSON">{"name":"Заглушка"}</script>';
+    expect(rules('<p>Склад</p>', 'production', head)).toEqual(['V9']);
+    expect(rules('<p>Склад</p>', 'staging', head)).toEqual([]);
+  });
+
+  it('JSON-LD, который не разбирается, — нарушение, а не молчаливый пропуск', () => {
+    const errors = checkHtml(page('<p>Склад</p>', '<title>Склад</title><script type="application/ld+json">{"name":</script>'), { env: 'production', route: '/' });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/^\/: <script ld\+json> JSON-LD не разбирается/);
   });
 
   it('проверяются alt, aria-label, title, description и текстовые og-свойства, служебные og — нет', () => {
