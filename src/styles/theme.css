@@ -126,6 +126,61 @@
   --og-slogan-size: 4rem;                                       /* 64 */
   --og-product-size: 3.5rem;                                    /* 56: «name — descriptor» (build:og --product) */
 
+  /* Мокап-кит (ep03): экраны продуктов на демо-данных, src/components/mockup/.
+     Светлая палитра — веб-консоль, стол, дашборд; тёмная --mock-terminal-* — ТСД. Ориентир —
+     UI-киты ДС; где их цвет не даёт AA для мелкого текста, он затемнён (приглушённый #8A7A70 →
+     bark-600, текст «успех» leaf-500 → #3F653B). Пары «текст/фон» — в contrast.test.ts:
+     мелкий текст ≥ 4.5, крупные значения и графика ≥ 3.0. На рыжем rust-500 в ките мелкого
+     текста нет: кнопка — rust-600 с молоком. */
+  --mock-bg: var(--bk-milk-50);                                 /* окно */
+  --mock-panel: #FFFFFF;                                        /* панель, карточка, строка */
+  --mock-rail: var(--bk-milk-100);                              /* рейл, шапка окна */
+  --mock-line: var(--bk-oat-200);
+  --mock-line-strong: var(--bk-oat-300);
+  --mock-text: var(--bk-bark-900);
+  --mock-text-muted: var(--bk-bark-600);
+  --mock-accent: var(--bk-rust-500);                            /* заливки, крупные значения */
+  --mock-accent-text: var(--bk-rust-600);                       /* мелкий текст акцентом */
+  --mock-bar: var(--bk-rust-500);                               /* заполненная часть полосы */
+  --mock-bar-track: var(--bk-oat-200);                          /* пустая часть полосы */
+  --mock-button-bg: var(--bk-rust-600);
+  --mock-on-button: var(--bk-milk-50);
+  --mock-tone-ok-fg: #3F653B;
+  --mock-tone-ok-bg: var(--bk-leaf-100);
+  --mock-tone-warn-fg: #8A5A1E;
+  --mock-tone-warn-bg: var(--bk-honey-100);
+  --mock-tone-risk-fg: var(--bk-berry-500);
+  --mock-tone-risk-bg: var(--bk-berry-100);
+  --mock-tone-neutral-fg: var(--bk-bark-600);
+  --mock-tone-neutral-bg: var(--bk-oat-200);
+  --mock-terminal-bg: var(--bk-bark-950);
+  --mock-terminal-panel: var(--bk-bark-850);
+  --mock-terminal-line: var(--bk-bark-750);
+  --mock-terminal-text: var(--bk-milk-50);
+  --mock-terminal-muted: var(--bk-oat-300);
+  --mock-terminal-accent: var(--bk-rust-300);                   /* адрес ячейки, акцент на тёмном */
+  --mock-terminal-done: var(--bk-rust-300);                     /* пройденный сегмент прогресса */
+  --mock-terminal-todo: var(--bk-bark-750);
+  --mock-terminal-button-bg: var(--bk-rust-600);
+  --mock-terminal-on-button: var(--bk-milk-50);
+
+  /* Кегль мокапа растёт с его контейнером (cqi — от ближайшего query-контейнера-предка:
+     ставится на потомка корня фигуры, не на сам корень). Пол 12px — аудит font-size
+     Lighthouse. Остальные размеры внутри — в em от этого кегля. */
+  --mock-font: clamp(0.75rem, 3cqi, 0.875rem);                  /* 12 → 14 */
+  --mock-font-lg: 1.5em;                                        /* значения KPI, заголовок экрана */
+  --mock-font-xl: 2.25em;                                       /* адрес ячейки ТСД */
+  --mock-row-h: 2.25em;
+  --mock-pad: 0.75em;
+  --mock-gap: 0.5em;
+  --mock-bar-h: 0.5em;
+  --mock-rail-w: 9em;                                           /* рейл консоли на широком */
+  --mock-radius: var(--radius-sm);                              /* поле, пилюля, панель */
+  --mock-window-radius: var(--radius-card);
+  --mock-device-radius: 1.75rem;                                /* 28: корпус ТСД */
+  --mock-device-bezel: 0.625rem;                                /* 10: рамка корпуса */
+  --mock-device-max: 20rem;                                     /* 320: ширина корпуса ТСД */
+
   /* Движение */
   --motion-duration-fast: var(--dur-fast);
   --motion-duration-base: var(--dur-base);

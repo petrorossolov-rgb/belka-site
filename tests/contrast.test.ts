@@ -80,6 +80,54 @@ describe('контраст темы (WCAG AA)', () => {
   });
 });
 
+// Мокап-кит (ep03): контраст держат токены и этот тест, а не `inert` — axe под `inert`
+// контраст не меряет. Мелкий текст ≥ 4.5, крупные значения и графика (WCAG 1.4.11) ≥ 3.0.
+describe('мокап-кит: светлая палитра и ТСД', () => {
+  const TONES = ['ok', 'warn', 'risk', 'neutral'] as const;
+  const pairs: Array<[fg: string, bg: string, min: number]> = [
+    ...['--mock-bg', '--mock-panel', '--mock-rail'].flatMap((bg): Array<[string, string, number]> => [
+      ['--mock-text', bg, 4.5],
+      ['--mock-text-muted', bg, 4.5],
+      ['--mock-accent-text', bg, 4.5],
+    ]),
+    ...TONES.map((tone): [string, string, number] => [`--mock-tone-${tone}-fg`, `--mock-tone-${tone}-bg`, 4.5]),
+    ...TONES.map((tone): [string, string, number] => [`--mock-tone-${tone}-fg`, '--mock-panel', 4.5]),
+    ['--mock-on-button', '--mock-button-bg', 4.5],
+    // Крупные значения акцентом и графика.
+    ['--mock-accent', '--mock-panel', 3.0],
+    ['--mock-bar', '--mock-bar-track', 3.0],
+    ['--mock-bar', '--mock-panel', 3.0],
+    ...['--mock-terminal-bg', '--mock-terminal-panel'].flatMap((bg): Array<[string, string, number]> => [
+      ['--mock-terminal-text', bg, 4.5],
+      ['--mock-terminal-muted', bg, 4.5],
+      ['--mock-terminal-accent', bg, 4.5],
+    ]),
+    ['--mock-terminal-on-button', '--mock-terminal-button-bg', 4.5],
+    ['--mock-terminal-done', '--mock-terminal-panel', 3.0],
+  ];
+
+  it.each(pairs)('%s на %s ≥ %d', (fg, bg, min) => {
+    const ratio = contrast(resolveColor(theme, fg), resolveColor(theme, bg));
+    expect(ratio, `${fg} на ${bg}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(min);
+  });
+
+  it('каждый цветовой mock-токен есть хотя бы в одной паре', () => {
+    const colors = [...theme.keys()].filter(
+      (name) => name.startsWith('--mock-') && /^(#|var\(--bk-)/.test(theme.get(name) ?? ''),
+    );
+    const paired = new Set(pairs.flatMap(([fg, bg]) => [fg, bg]));
+    // Линии и пустые сегменты — разделители, не носители смысла: пары им не нужны.
+    const decorative = ['--mock-line', '--mock-line-strong', '--mock-terminal-line', '--mock-terminal-todo'];
+    expect(colors.filter((name) => !paired.has(name) && !decorative.includes(name))).toEqual([]);
+  });
+
+  it('на рыжем rust-500 в ките нет мелкого текста: кнопка — не #C4552A', () => {
+    for (const bg of ['--mock-button-bg', '--mock-terminal-button-bg']) {
+      expect(resolveColor(theme, bg).toUpperCase()).not.toBe('#C4552A');
+    }
+  });
+});
+
 describe('плашка героя: оба варианта маппинга', () => {
   const PLATE_VARIANTS = ['bark', 'rust'] as const;
   type PlateVariant = (typeof PLATE_VARIANTS)[number];
