@@ -30,8 +30,10 @@ const site = await getSite();
 
 const url = canonical ? canonicalUrl(site.url, Astro.url.pathname) : undefined;
 
-// Картинка и alt — из одной записи (страницы или сайта). Размеры — исходного файла: getImage
-// не масштабирует, а check-dist-seo сверяет их с файлом в сборке и держит вес ≤ 300 КБ.
+// Картинка и alt — из одной записи (страницы, продукта или сайта). OG-карточка — всегда PNG
+// 1200×630: так её рисует build:og, требует целостность контента и принимает check-dist-seo
+// (ep03). Размеры — исходного файла: getImage не масштабирует, а check-dist-seo сверяет их с
+// файлом в сборке и держит вес ≤ 300 КБ.
 // Перекодирование в PNG теряет палитру build:og (ep02 T13: 18 → 42 КБ) — запас большой, отдельной
 // ветки «PNG без перекодирования» не нужно; если карточка потяжелеет, гейт упадёт раньше прода.
 const preview = previewImage(
@@ -44,7 +46,7 @@ const image =
     : {
         url: assetUrl(
           site.url,
-          (await getImage({ src: preview.image, format: preview.image.format === 'jpg' ? 'jpg' : 'png' })).src,
+          (await getImage({ src: preview.image, format: 'png' })).src,
         ),
         width: preview.image.width,
         height: preview.image.height,

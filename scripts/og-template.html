@@ -3,7 +3,8 @@
   Шаблон OG-карточки 1200×630 для npm run build:og (scripts/build-og.mjs). Открывается через
   встроенный сервер с корнем в корне проекта: пути ниже — от корня, file:// шрифты не загрузит.
   Цвета и размеры — только токены темы (tokens/*.css, theme.css); шрифт, знак и словесный знак —
-  те же файлы, что у сайта, без перекраски. Слоган подставляет скрипт из site.yaml.
+  те же файлы, что у сайта, без перекраски. Скрипт оставляет одну строку: слоган из site.yaml
+  ([data-slogan]) или, с --product <id>, «name — descriptor» продукта ([data-product]).
 -->
 <html lang="ru">
   <head>
@@ -80,6 +81,15 @@
         line-height: var(--leading-tight);
         letter-spacing: var(--letter-spacing-display);
       }
+
+      /* На рыжей плашке — только крупный текст (соглашение contrast.test.ts). */
+      .card__product {
+        color: var(--color-plate-accent);
+        font-size: var(--og-product-size);
+        font-weight: var(--font-weight-heavy);
+        line-height: var(--leading-tight);
+        letter-spacing: var(--letter-spacing-display);
+      }
     </style>
   </head>
   <body>
@@ -89,6 +99,7 @@
         <img class="card__wordmark" src="/src/assets/brand/wordmark-latin-milk.png" alt="" />
       </div>
       <p class="card__slogan" data-slogan></p>
+      <p class="card__product" data-product></p>
     </main>
   </body>
 </html>
