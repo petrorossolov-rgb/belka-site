@@ -1,0 +1,25 @@
+---
+// Имя продукта по ДС: «Belka» жирным, остальное — светлее (Belka WMS, Belka Analytics).
+// Экранный диктор читает имя целиком: разметка — два строчных span с пробелом между ними.
+import { PRODUCT_NAME_PREFIX } from '../../lib/schemas';
+
+interface Props {
+  name: string;
+}
+
+const { name } = Astro.props;
+const brand = PRODUCT_NAME_PREFIX.trim();
+const rest = name.slice(PRODUCT_NAME_PREFIX.length);
+---
+
+<span class="product-name"><span class="product-name__brand">{brand}</span> {rest}</span>
+
+<style>
+  .product-name {
+    font-weight: var(--font-weight-regular);
+  }
+
+  .product-name__brand {
+    font-weight: var(--font-weight-heavy);
+  }
+</style>

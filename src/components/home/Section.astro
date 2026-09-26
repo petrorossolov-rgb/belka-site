@@ -1,0 +1,79 @@
+---
+// Секция страницы из блока `blocks/*.md`: надзаголовок, `h2`, лид, содержимое вида (слот)
+// и ссылка блока — только если целевая страница видима в текущем окружении.
+// Черновой блок сюда попадает только там, где черновики видны: у него маркер
+// `data-draft-block` (check-dist-seo роняет с ним production-сборку) и служебная подпись.
+import { blockLink } from '../../lib/content-core';
+import { getVisible, type Block } from '../../lib/content';
+
+interface Props {
+  block: Block;
+}
+
+const { block } = Astro.props;
+const { eyebrow, title, lead, draft } = block.data;
+const link = blockLink(block, await getVisible('pages'));
+const headingId = `section-${block.id}`;
+---
+
+<section class="section" aria-labelledby={headingId} data-draft-block={draft ? block.id : undefined}>
+  <div class="container section__inner">
+    {draft && <p class="section__draft">Черновик — секция не опубликована</p>}
+    <header class="section__head">
+      {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+      <h2 id={headingId}>{title}</h2>
+      {lead && <p class="section__lead">{lead}</p>}
+    </header>
+    <slot />
+    {
+      link && (
+        <p class="section__link">
+          <a href={link.href}>{link.label}</a>
+        </p>
+      )
+    }
+  </div>
+</section>
+
+<style>
+  .section + .section {
+    border-block-start: var(--border-width) solid var(--color-border);
+  }
+
+  .section__inner {
+    display: grid;
+    gap: var(--section-gap);
+    padding-block: var(--space-section);
+  }
+
+  .section__inner > * {
+    min-width: 0;
+  }
+
+  .section__head {
+    display: grid;
+    gap: var(--space-sm);
+    max-width: var(--measure);
+  }
+
+  .section__lead {
+    color: var(--color-text-muted);
+    font-size: var(--text-h3);
+    line-height: var(--leading-snug);
+  }
+
+  .section__draft {
+    justify-self: start;
+    padding: var(--space-2xs) var(--space-xs);
+    border-radius: var(--radius-field);
+    background: var(--color-draft-bg);
+    font-family: var(--font-code);
+    font-size: var(--text-eyebrow);
+    letter-spacing: var(--letter-spacing-caps);
+    text-transform: uppercase;
+  }
+
+  .section__link {
+    font-weight: var(--font-weight-bold);
+  }
+</style>

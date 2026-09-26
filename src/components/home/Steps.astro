@@ -1,0 +1,53 @@
+---
+// Вид `steps`: этапы по порядку — `<ol>`; номер рисует счётчик CSS, в тексте цифр нет.
+import type { Block } from '../../lib/content';
+
+interface Props {
+  block: Block;
+}
+
+const { items } = Astro.props.block.data;
+---
+
+<ol class="steps">
+  {
+    items.map((item) => (
+      <li class="steps__item">
+        <h3 class="steps__title">{item.title}</h3>
+        {item.text && <p>{item.text}</p>}
+      </li>
+    ))
+  }
+</ol>
+
+<style>
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--card-min), 100%), 1fr));
+    gap: var(--space-lg);
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+
+  .steps__item {
+    display: grid;
+    align-content: start;
+    gap: var(--space-xs);
+    min-width: 0;
+    counter-increment: step;
+  }
+
+  .steps__item::before {
+    content: counter(step, decimal-leading-zero);
+    color: var(--color-text-muted);
+    font-family: var(--font-code);
+    font-size: var(--step-number-size);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--leading-tight);
+  }
+
+  .steps__title {
+    hyphens: auto;
+  }
+</style>

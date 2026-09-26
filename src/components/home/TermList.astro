@@ -1,0 +1,45 @@
+---
+// Вид `list`: компактная сетка пунктов (охват системы); у пункта — название и, если есть, текст.
+import type { Block } from '../../lib/content';
+
+interface Props {
+  block: Block;
+}
+
+const { items } = Astro.props.block.data;
+---
+
+<ul class="term-list" role="list">
+  {
+    items.map((item) => (
+      <li class="term-list__item">
+        {item.title}
+        {item.text && <span class="term-list__text">{item.text}</span>}
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .term-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--term-min), 100%), 1fr));
+    gap: var(--space-xs) var(--space-lg);
+    padding: 0;
+    list-style: none;
+  }
+
+  .term-list__item {
+    display: grid;
+    gap: var(--space-2xs);
+    min-width: 0;
+    padding-block: var(--space-xs);
+    border-block-end: var(--border-width) solid var(--color-border);
+    hyphens: auto;
+  }
+
+  .term-list__text {
+    color: var(--color-text-muted);
+    font-size: var(--text-small);
+  }
+</style>

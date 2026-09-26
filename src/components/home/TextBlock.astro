@@ -1,0 +1,22 @@
+---
+// Вид `text`: тело блока (Markdown) текстовой колонкой.
+import { renderBlock, type Block } from '../../lib/content';
+
+interface Props {
+  block: Block;
+}
+
+const { Content } = await renderBlock(Astro.props.block);
+---
+
+<div class="text-block">
+  <Content />
+</div>
+
+<style>
+  .text-block {
+    display: grid;
+    gap: var(--space-md);
+    max-width: var(--measure);
+  }
+</style>

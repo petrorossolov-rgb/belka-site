@@ -83,7 +83,7 @@ describe('контраст темы (WCAG AA)', () => {
 describe('плашка героя: оба варианта маппинга', () => {
   const PLATE_VARIANTS = ['bark', 'rust'] as const;
   type PlateVariant = (typeof PLATE_VARIANTS)[number];
-  const pair = (variant: PlateVariant, fg: 'on' | 'muted') =>
+  const pair = (variant: PlateVariant, fg: 'on' | 'muted' | 'accent') =>
     contrast(resolveColor(theme, `--plate-${variant}-${fg}`), resolveColor(theme, `--plate-${variant}-bg`));
 
   // Оба варианта проверяются независимо от того, какой включён: переключение — правка маппинга.
@@ -95,14 +95,18 @@ describe('плашка героя: оба варианта маппинга', ()
     expect(pair('rust', fg)).toBeGreaterThanOrEqual(3.0);
   });
 
+  it.each(PLATE_VARIANTS)('%s: акцент плашки (слоган, только крупный текст) ≥ 3.0', (variant) => {
+    expect(pair(variant, 'accent')).toBeGreaterThanOrEqual(3.0);
+  });
+
   it('рыжий — рыжий бренда #C4552A, знак на нём молочный', () => {
     expect(resolveColor(theme, '--plate-rust-bg').toUpperCase()).toBe('#C4552A');
     expect(resolveColor(theme, '--plate-rust-on')).toBe(resolveColor(theme, '--bk-milk-50'));
   });
 
-  /** Включённый вариант: все три токена `--color-plate-*` указывают на один вариант. */
+  /** Включённый вариант: все токены маппинга плашки указывают на один вариант. */
   function activePlate(tokens: TokenMap): PlateVariant {
-    const variants = ['bg', 'on', 'muted'].map((part) => {
+    const variants = ['bg', 'on', 'muted', 'accent'].map((part) => {
       const name = part === 'on' ? '--color-on-plate' : `--color-plate-${part}`;
       return new RegExp(`^var\\(--plate-(\\w+)-${part}\\)$`).exec(tokens.get(name) ?? '')?.[1];
     });
@@ -116,7 +120,7 @@ describe('плашка героя: оба варианта маппинга', ()
   it('маппинг --color-plate-* указывает на один вариант целиком', () => {
     expect(PLATE_VARIANTS).toContain(activePlate(theme));
     const mixed = parseTokens(
-      ':root { --color-plate-bg: var(--plate-rust-bg); --color-on-plate: var(--plate-bark-on); --color-plate-muted: var(--plate-rust-muted); }',
+      ':root { --color-plate-bg: var(--plate-rust-bg); --color-on-plate: var(--plate-rust-on); --color-plate-muted: var(--plate-rust-muted); --color-plate-accent: var(--plate-bark-accent); }',
     );
     expect(() => activePlate(mixed)).toThrow(/смешивает/);
   });

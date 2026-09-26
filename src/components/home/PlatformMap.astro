@@ -1,0 +1,76 @@
+---
+// Вид `platform-map`: продукты платформы по `mapOrder` — имя и `summary`; сетка 1 / 2 / 4
+// колонки (токены `--map-columns-*`). Ссылка — только на собранную страницу продукта
+// (`isLinkable`): черновая страница в production не собирается, и ссылки на неё нет.
+import ProductName from './ProductName.astro';
+import { isLinkable, productHref } from '../../lib/content-core';
+import { getPlatformMap, getProductPages, type Block } from '../../lib/content';
+
+interface Props {
+  block: Block;
+}
+
+const products = await getPlatformMap();
+const pages = await getProductPages();
+---
+
+<ul class="platform-map" role="list">
+  {
+    products.map((product) => (
+      <li class="platform-map__item">
+        <h3 class="platform-map__name">
+          {isLinkable(product, pages) ? (
+            <a href={productHref(product.id)}>
+              <ProductName name={product.data.name} />
+            </a>
+          ) : (
+            <ProductName name={product.data.name} />
+          )}
+        </h3>
+        <p class="platform-map__summary">{product.data.summary}</p>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .platform-map {
+    display: grid;
+    grid-template-columns: repeat(var(--map-columns-sm), minmax(0, 1fr));
+    gap: var(--space-sm);
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (width >= 48rem) {
+    .platform-map {
+      grid-template-columns: repeat(var(--map-columns-md), minmax(0, 1fr));
+    }
+  }
+
+  @media (width >= 64rem) {
+    .platform-map {
+      grid-template-columns: repeat(var(--map-columns-lg), minmax(0, 1fr));
+    }
+  }
+
+  .platform-map__item {
+    display: grid;
+    align-content: start;
+    gap: var(--space-xs);
+    min-width: 0;
+    padding: var(--space-lg);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  .platform-map__name {
+    hyphens: auto;
+  }
+
+  .platform-map__summary {
+    color: var(--color-text-muted);
+    font-size: var(--text-small);
+  }
+</style>

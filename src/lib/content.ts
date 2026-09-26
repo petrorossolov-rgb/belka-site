@@ -2,7 +2,7 @@
 // не вызывают `getCollection` / `getEntry` сами. Логика — в `content-core.ts`,
 // здесь только чтение коллекций, `SITE_ENV` и проверка целостности один раз за сборку.
 
-import { getCollection, getEntry, type CollectionEntry } from 'astro:content';
+import { getCollection, getEntry, render, type CollectionEntry } from 'astro:content';
 import { SITE_ENV } from 'astro:env/server';
 import * as core from './content-core';
 import type { NavItem, NavPlacement } from './content-core';
@@ -71,6 +71,14 @@ export async function getPage(id: string): Promise<Page> {
 export async function getSections(page: Page): Promise<Block[]> {
   await ensureIntegrity();
   return core.resolveSections(page, await getCollection('blocks'), SITE_ENV);
+}
+
+/**
+ * Тело блока (`view: text`) для компонента секции. Компоненты не импортируют `astro:content`:
+ * `render` напрямую берут только страницы (`tests/content-access.test.ts`).
+ */
+export async function renderBlock(block: Block): ReturnType<typeof render> {
+  return render(block);
 }
 
 export async function getNav(placement: NavPlacement): Promise<NavItem[]> {

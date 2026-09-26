@@ -1,0 +1,61 @@
+---
+// Вид `products`: карточки `featured`-продуктов — метка `short`, имя и `lead`. Порядок —
+// сначала платформа по `mapOrder`, затем отдельные продукты; ссылка — по тому же правилу,
+// что на карте (`isLinkable`).
+import ProductName from './ProductName.astro';
+import { isLinkable, productHref } from '../../lib/content-core';
+import { getFeaturedProducts, getProductPages, type Block } from '../../lib/content';
+
+interface Props {
+  block: Block;
+}
+
+const products = await getFeaturedProducts();
+const pages = await getProductPages();
+---
+
+<ul class="product-cards" role="list">
+  {
+    products.map((product) => (
+      <li class="product-cards__card">
+        <p class="eyebrow">{product.data.short}</p>
+        <h3 class="product-cards__name">
+          {isLinkable(product, pages) ? (
+            <a href={productHref(product.id)}>
+              <ProductName name={product.data.name} />
+            </a>
+          ) : (
+            <ProductName name={product.data.name} />
+          )}
+        </h3>
+        {product.data.lead && <p>{product.data.lead}</p>}
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .product-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--card-min), 100%), 1fr));
+    gap: var(--space-sm);
+    padding: 0;
+    list-style: none;
+  }
+
+  .product-cards__card {
+    display: grid;
+    align-content: start;
+    gap: var(--space-xs);
+    min-width: 0;
+    padding: var(--space-lg);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  .product-cards__name {
+    font-size: var(--text-h2);
+    hyphens: auto;
+  }
+</style>
