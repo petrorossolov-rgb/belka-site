@@ -4,7 +4,7 @@ short: YMS
 domain: yard
 kind: platform
 mapOrder: 3
-summary: "Заглушка ep01: описание ещё не утверждено."
+summary: "Пробный текст: описание ещё не утверждено."
 readiness: planned  # скрыто: выводится только при site.flags.showReadiness
 ---
 
