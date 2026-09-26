@@ -1,30 +1,12 @@
 ---
-// Главная: герой из `pages/index.md → hero` и секции из `sections` — компонент по `view` блока.
-// Карта видов типизирована `Record<BlockView, …>`: новый вид без компонента не пройдёт
-// `astro check`. Шапки нет (знак крупно в герое, меню пустое), в подвале — только строка ©.
-import CardGrid from '../components/home/CardGrid.astro';
+// Главная: герой из `pages/index.md → hero` и секции из `sections` — общий рендер
+// `Sections.astro` (компонент по `view` блока). Шапки нет (знак крупно в герое, меню
+// пустое), в подвале — только строка ©.
 import Hero from '../components/home/Hero.astro';
-import PlatformMap from '../components/home/PlatformMap.astro';
-import ProductCards from '../components/home/ProductCards.astro';
-import Section from '../components/home/Section.astro';
-import Steps from '../components/home/Steps.astro';
-import Surfaces from '../components/home/Surfaces.astro';
-import TermList from '../components/home/TermList.astro';
-import TextBlock from '../components/home/TextBlock.astro';
+import Sections from '../components/sections/Sections.astro';
 import Base from '../layouts/Base.astro';
-import { getPage, getSections, getSite, type Block } from '../lib/content';
-import type { BlockView } from '../lib/schemas';
+import { getPage, getSections, getSite } from '../lib/content';
 import { buildTitle } from '../lib/seo';
-
-const VIEWS: Record<BlockView, (props: { block: Block }) => unknown> = {
-  text: TextBlock,
-  cards: CardGrid,
-  steps: Steps,
-  list: TermList,
-  'platform-map': PlatformMap,
-  products: ProductCards,
-  surfaces: Surfaces,
-};
 
 const site = await getSite();
 const page = await getPage('index');
@@ -41,14 +23,5 @@ const { title, description, draft, ogImage, ogImageAlt } = page.data;
   brandScreen
 >
   <Hero page={page} site={site} />
-  {
-    sections.map((block) => {
-      const View = VIEWS[block.data.view];
-      return (
-        <Section block={block}>
-          <View block={block} />
-        </Section>
-      );
-    })
-  }
+  <Sections blocks={sections} />
 </Base>
