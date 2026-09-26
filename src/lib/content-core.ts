@@ -2,7 +2,8 @@
 // Без импорта `astro:*` — работает на любых объектах вида `{ id, data, body? }`,
 // поэтому тесты не поднимают Astro. Доступ к коллекциям — только `src/lib/content.ts`.
 
-import type { BlockView, MockupKind } from './schemas';
+import { LIMITS, type BlockView, type MockupKind } from './schemas';
+import { productTitle } from './seo';
 import type { SiteEnv } from './site-env';
 
 /** Формат id записи (и каждого сегмента вложенного id страницы). */
@@ -47,6 +48,7 @@ export interface ImageMetaLike {
 }
 
 export type ProductLike = EntryLike<{
+  name: string;
   kind: 'platform' | 'standalone';
   mapOrder?: number | undefined;
   hasPage: boolean;
@@ -56,6 +58,7 @@ export type ProductLike = EntryLike<{
   lead?: string | undefined;
   sections?: readonly RefLike[] | undefined;
   ogImage?: ImageMetaLike | undefined;
+  seo?: { title?: string | undefined } | undefined;
   draft: boolean;
 }>;
 
@@ -320,6 +323,14 @@ export function assertContentIntegrity({
     }
     if ((product.body ?? '').trim() !== '') {
       errors.push(`${source(product)}: у продукта со страницей (hasPage) тела нет — страница собирается из sections`);
+    }
+    // `<title>` до суффикса сайта — как у страницы (`titleMax`): «имя — пояснение» длиннее
+    // лимита требует короткого `seo.title` (его длину держит схема).
+    const title = productTitle(product.data);
+    if (title.length > LIMITS.titleMax) {
+      errors.push(
+        `${source(product)}: заголовок страницы «${title}» длиннее ${LIMITS.titleMax} символов — задайте seo.title`,
+      );
     }
   }
 
