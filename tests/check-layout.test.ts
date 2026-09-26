@@ -144,11 +144,13 @@ describe('check-layout: findOverflow', () => {
     ]);
   });
 
-  it('левая граница: потомок умещающегося контейнера прокрутки проходит, контейнер левее окна — нет', () => {
+  it('левая граница: контейнер прокрутки не освобождает — влево от начала он не прокручивается', () => {
     const scroller = rect({ selector: 'div.scroll', right: 360, width: 360, scrollWidth: 800, clientWidth: 360, overflowX: 'auto' });
     const child = rect({ selector: 'div.item', parent: 0, left: -200, right: 100, width: 300 });
-    expect(check([scroller, child])).toEqual([]);
+    expect(check([scroller, child]).map((o) => o.selector)).toEqual(['div.item']);
     expect(check([{ ...scroller, left: -1 }, child]).map((o) => o.selector)).toEqual(['div.scroll', 'div.item']);
+    // Потомок правее окна в умещающемся контейнере по-прежнему освобождён.
+    expect(check([scroller, rect({ selector: 'div.item', parent: 0, left: 300, right: 800, width: 500 })])).toEqual([]);
   });
 
   it('visually-hidden за левым краем не проверяется', () => {

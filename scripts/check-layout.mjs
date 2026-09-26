@@ -49,7 +49,8 @@ const px = (/** @type {number} */ n) => `${Math.round(n * 100) / 100}px`;
  * нет, контент просто теряется); содержимое видимого элемента шире его бокса (scrollWidth >
  * clientWidth: длинное слово, обрезка под overflow: hidden|clip).
  * Исключение — только потомки контейнера overflow-x: auto|scroll, который сам умещается в окно
- * (правила границ), и сам такой контейнер (правило содержимого). Невидимые элементы —
+ * (правило правой границы; влево от начала LTR-контейнер не прокручивается), и сам такой
+ * контейнер (правило содержимого). Невидимые элементы —
  * display: none, visibility: hidden, нулевой размер, visually-hidden (≤ 1×1 с обрезкой) и его
  * потомки — не проверяются.
  * @param {Measure} measure
@@ -78,10 +79,11 @@ export function findOverflow({ viewport, scrollWidth, rects }) {
     const scrollerRect = s >= 0 ? rects[s] : undefined;
     const insideFittingScroller = scrollerRect !== undefined
       && scrollerRect.left >= -EPSILON && scrollerRect.right <= viewport + EPSILON;
+    // Левый край без исключения: в LTR-контейнере прокрутки влево от начала нет.
     if (r.right > viewport + EPSILON && !insideFittingScroller) {
       found.push({ selector: r.selector, reason: `правая граница ${px(r.right)} за окном ${px(viewport)}` });
     }
-    if (r.left < -EPSILON && !insideFittingScroller) {
+    if (r.left < -EPSILON) {
       found.push({ selector: r.selector, reason: `левая граница ${px(r.left)} за левым краем окна` });
     }
     if (!SCROLLERS.includes(r.overflowX) && r.scrollWidth > r.clientWidth) {
