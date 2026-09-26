@@ -34,7 +34,8 @@
      «Кора» — любой текст (контраст ≥ 4.5). «Рыжий» — только крупный текст (≥ 3.0;
      WCAG: от 24px или от 18.66px жирным): мелкий текст на рыжей плашке запрещён.
      Акцент плашки (слоган) — только крупный текст: на коре это рыжий бренда, на рыжем — молоко.
-     Оба варианта проверяет contrast.test.ts. Выбор — четыре строки маппинга ниже (T14). */
+     Оба варианта проверяет contrast.test.ts. Выбор — четыре строки маппинга ниже: владелец
+     выбрал «рыжий» 2026-09-26 (T14), поэтому на плашке только знак и слоган (HeroPlate.astro). */
   --plate-bark-bg: var(--bk-bark-900);
   --plate-bark-on: var(--bk-milk-50);
   --plate-bark-muted: var(--bk-oat-300);
@@ -43,10 +44,10 @@
   --plate-rust-on: var(--bk-milk-50);
   --plate-rust-muted: var(--bk-milk-100);
   --plate-rust-accent: var(--bk-milk-50);
-  --color-plate-bg: var(--plate-bark-bg);
-  --color-on-plate: var(--plate-bark-on);
-  --color-plate-muted: var(--plate-bark-muted);
-  --color-plate-accent: var(--plate-bark-accent);
+  --color-plate-bg: var(--plate-rust-bg);
+  --color-on-plate: var(--plate-rust-on);
+  --color-plate-muted: var(--plate-rust-muted);
+  --color-plate-accent: var(--plate-rust-accent);
 
   /* Гарнитуры: стеки с fallback-метриками объявляет Fonts API. */
   --font-body: var(--font-sans);
