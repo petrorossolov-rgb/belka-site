@@ -151,6 +151,49 @@ describe('check-dist-seo: инварианты сборки', () => {
     ]);
   });
 
+  it('внешний ресурс через style="", SVG <image>, object, embed, track, input, script src JSON-LD и @import "…" → ошибки', () => {
+    const dir = fixture('production');
+    edit(dir, 'index.html', (html) =>
+      html.replace(
+        '</body>',
+        [
+          '<div style="background-image:url(https://cdn.example.com/a.png)"></div>',
+          '<div style="background:url(&quot;//cdn.example.com/b.png&quot;)"></div>',
+          '<svg><image href="https://cdn.example.com/c.png"/><image xlink:href="https://cdn.example.com/d.png"/></svg>',
+          '<object data="https://cdn.example.com/e.pdf"></object>',
+          '<embed src="https://cdn.example.com/f.pdf">',
+          '<video><track src="https://cdn.example.com/g.vtt"></video>',
+          '<input type="image" src="https://cdn.example.com/h.png" alt="">',
+          '<script type="application/ld+json" src="https://cdn.example.com/i.json"></script>',
+          '</body>',
+        ].join(''),
+      ),
+    );
+    writeFileSync(join(dir, '_astro', 'base.css'), '@import "https://cdn.example.com/j.css";@import \'//cdn.example.com/k.css\';');
+    expect(check(dir, 'production').errors.sort()).toEqual([
+      '_astro/base.css: внешний ресурс //cdn.example.com/k.css',
+      '_astro/base.css: внешний ресурс https://cdn.example.com/j.css',
+      'index.html: внешний ресурс <embed src> https://cdn.example.com/f.pdf',
+      'index.html: внешний ресурс <image href> https://cdn.example.com/c.png',
+      'index.html: внешний ресурс <image xlink:href> https://cdn.example.com/d.png',
+      'index.html: внешний ресурс <input src> https://cdn.example.com/h.png',
+      'index.html: внешний ресурс <object data> https://cdn.example.com/e.pdf',
+      'index.html: внешний ресурс <script src> https://cdn.example.com/i.json',
+      'index.html: внешний ресурс <track src> https://cdn.example.com/g.vtt',
+      'index.html: внешний ресурс url() в style у <div> //cdn.example.com/b.png',
+      'index.html: внешний ресурс url() в style у <div> https://cdn.example.com/a.png',
+    ].sort());
+  });
+
+  it('свои ресурсы в style="", SVG <image> и @import проходят', () => {
+    const dir = fixture('production');
+    edit(dir, 'index.html', (html) =>
+      html.replace('</body>', '<div style="background:url(/_astro/a.png)"></div><svg><image href="/_astro/c.png"/></svg></body>'),
+    );
+    writeFileSync(join(dir, '_astro', 'base.css'), '@import "/_astro/j.css";');
+    expect(check(dir, 'production').errors).toEqual([]);
+  });
+
   it('preload файла Plex Mono (--font-mono) → ошибка', () => {
     const dir = fixture('production');
     edit(
