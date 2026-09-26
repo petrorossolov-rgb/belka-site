@@ -1,8 +1,9 @@
 // @ts-check
-// Гейт адаптива (ep02 T03): ни одна страница сборки не шире окна на 360 / 768 / 1440 и ничего не
-// уходит за его левый или правый край.
+// Гейт адаптива (ep02 T03; 1024 — ep03 T07): ни одна страница сборки не шире окна на
+// 360 / 768 / 1024 / 1440 и ничего не уходит за его левый или правый край. 1024 — перелом
+// 64rem и контейнерные запросы мокапов: без неё они проверялись бы только косвенно.
 //
-//   node scripts/check-layout.mjs --dist <dir> [--widths 360,768,1440]
+//   node scripts/check-layout.mjs --dist <dir> [--widths 360,768,1024,1440]
 //
 // Страницы — все **/*.html сборки (и /404.html), открываются в системном Chrome (playwright-core,
 // channel: 'chrome', браузер не скачивается) через встроенный сервер на 127.0.0.1. В браузере
@@ -33,7 +34,7 @@ import { startStaticServer } from './lib/static-server.mjs';
  * @typedef {{ selector: string, reason: string }} Overflow
  */
 
-export const DEFAULT_WIDTHS = [360, 768, 1440];
+export const DEFAULT_WIDTHS = [360, 768, 1024, 1440];
 export const VIEWPORT_HEIGHT = 800;
 /** Дробные доли пикселя от округления раскладки — не переполнение; 1 px — уже да. */
 const EPSILON = 0.5;
@@ -198,7 +199,7 @@ export async function checkLayout({ distDir, widths = DEFAULT_WIDTHS, executable
   return { errors, pages: files.length };
 }
 
-const USAGE = 'использование: node scripts/check-layout.mjs --dist <dir> [--widths 360,768,1440]';
+const USAGE = 'использование: node scripts/check-layout.mjs --dist <dir> [--widths 360,768,1024,1440]';
 
 /** @returns {{ distDir: string, widths: number[] } | undefined} */
 export function parseArgs(/** @type {string[]} */ argv) {

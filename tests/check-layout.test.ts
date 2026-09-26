@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { ChromeError, checkLayout, findOverflow, parseArgs } from '../scripts/check-layout.mjs';
+import { ChromeError, DEFAULT_WIDTHS, checkLayout, findOverflow, parseArgs } from '../scripts/check-layout.mjs';
 import { startStaticServer } from '../scripts/lib/static-server.mjs';
 
 // Пробы plan ep02 A6 и граничные случаи T03. Интеграционная часть запускает системный Chrome:
@@ -166,7 +166,8 @@ describe('check-layout: findOverflow', () => {
 
 describe('check-layout: аргументы', () => {
   it('--dist обязателен, --widths — целые через запятую', () => {
-    expect(parseArgs(['--dist', 'dist'])).toEqual({ distDir: 'dist', widths: [360, 768, 1440] });
+    expect(parseArgs(['--dist', 'dist'])).toEqual({ distDir: 'dist', widths: [360, 768, 1024, 1440] });
+    expect(DEFAULT_WIDTHS).toEqual([360, 768, 1024, 1440]);
     expect(parseArgs(['--widths', '360,1440', '--dist', 'd'])).toEqual({ distDir: 'd', widths: [360, 1440] });
     for (const argv of [[], ['--dist'], ['--widths', '360'], ['--dist', 'd', '--widths', '360,'], ['--dist', 'd', '--widths', '0'], ['--dist', 'd', '--widths', '36.5'], ['--dist', 'd', '--dist', 'e'], ['--env', 'production']]) {
       expect(parseArgs(argv), argv.join(' ')).toBeUndefined();
@@ -235,7 +236,7 @@ describe('check-layout: фикстуры в Chrome', () => {
   const failing = () => [...new Set(result.errors.map((e) => e.split(' ')[0]))];
 
   it('проверены все HTML, включая /404.html', () => {
-    expect(result.pages).toBe(10);
+    expect(result.pages).toBe(11);
   });
 
   it('падают ровно пробы: 361px, 361px под html/body и обёрткой overflow-x: hidden, длинное слово, absolute за краем, 1px за левым краем', () => {
@@ -271,9 +272,9 @@ describe('check-layout: CLI', { timeout: CHROME_TIMEOUT }, () => {
     return dir;
   }
 
-  it('чистая сборка → код 0 на трёх ширинах', () => {
+  it('чистая сборка → код 0 на четырёх ширинах', () => {
     const result = run('--dist', passingDist());
-    expect(result.stdout).toContain('check-layout 360/768/1440 (страниц: 3): OK');
+    expect(result.stdout).toContain('check-layout 360/768/1024/1440 (страниц: 3): OK');
     expect(result.status).toBe(0);
   });
 
@@ -285,6 +286,19 @@ describe('check-layout: CLI', { timeout: CHROME_TIMEOUT }, () => {
     expect(result.stderr).toContain('/wide/ @360: html — страница шире окна: scrollWidth 361px > 360px');
     expect(result.stderr).toContain('/wide/ @360: div.block — правая граница 361px за окном 360px');
     expect(result.status).toBe(1);
+  });
+
+  it('проба 1024: переполнение только на 64–70rem ловит список по умолчанию, старый [360, 768, 1440] — нет', () => {
+    const dir = passingDist();
+    cpSync(join(FIXTURES, 'only-1024'), join(dir, 'only-1024'), { recursive: true });
+    const byDefault = run('--dist', dir);
+    expect(byDefault.stderr).toContain('check-layout 360/768/1024/1440 (страниц: 4): нарушений');
+    expect(byDefault.stderr).toContain('/only-1024/ @1024: div.block — правая граница 1100px за окном 1024px');
+    expect(byDefault.stderr).not.toMatch(/@(360|768|1440):/);
+    expect(byDefault.status).toBe(1);
+    const old = run('--widths', '360,768,1440', '--dist', dir);
+    expect(old.stdout).toContain('check-layout 360/768/1440 (страниц: 4): OK');
+    expect(old.status).toBe(0);
   });
 
   it('страница, которую сервер не отдал (ответ не 200), — нарушение, а не молчаливый замер 404', () => {
