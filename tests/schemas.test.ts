@@ -3,8 +3,10 @@ import { z } from 'astro/zod';
 import {
   BLOCK_VIEWS,
   LIMITS,
+  MOCKUP_KIND_NAMES,
   blockSchema,
   caseSchema,
+  mockupSchema,
   pageSchema,
   productSchema,
   siteSchema,
@@ -12,16 +14,19 @@ import {
 import {
   validCardsBlock,
   validCase,
+  validMockups,
   validPage,
   validPlatformProduct,
   validSite,
   validSiteWithMetrika,
   validStandaloneProduct,
+  validSurfacesBlock,
 } from './fixtures/schemas';
 
 // `image()` и `reference()` есть только у Astro — в тестах их заменяют строки.
 const image = () => z.string();
 const reference = () => z.string();
+const product = productSchema(image, reference);
 const page = pageSchema(image, reference);
 const block = blockSchema(reference);
 const site = siteSchema(image);
@@ -45,89 +50,124 @@ describe('LIMITS и BLOCK_VIEWS', () => {
     expect(LIMITS).toMatchObject({ headingMax: 80, eyebrowMax: 60, leadMax: 320, linkLabelMax: 40, altMax: 120 });
   });
 
+  it('лимиты ep03 — как в плане ep03', () => {
+    expect(LIMITS).toMatchObject({ descriptorMax: 60, captionMax: 160, mockLabelMax: 28, mockCodeMax: 16, mockupNoteMax: 60 });
+  });
+
   it('виды секций', () => {
-    expect(BLOCK_VIEWS).toEqual(['text', 'cards', 'steps', 'list', 'platform-map', 'products']);
+    expect(BLOCK_VIEWS).toEqual(['text', 'cards', 'steps', 'list', 'platform-map', 'products', 'surfaces']);
   });
 });
 
 describe('product', () => {
   it('принимает продукт платформы и отдельный продукт', () => {
-    expect(productSchema.parse(validPlatformProduct)).toMatchObject({ kind: 'platform', mapOrder: 1 });
-    expect(productSchema.parse(validStandaloneProduct)).toMatchObject({ kind: 'standalone' });
+    expect(product.parse(validPlatformProduct)).toMatchObject({ kind: 'platform', mapOrder: 1 });
+    expect(product.parse(validStandaloneProduct)).toMatchObject({ kind: 'standalone' });
   });
 
   it('подставляет значения по умолчанию: hasPage, pageDraft, featured и draft — false', () => {
-    const parsed = productSchema.parse(validStandaloneProduct);
+    const parsed = product.parse(validStandaloneProduct);
     expect(parsed).toMatchObject({ hasPage: false, pageDraft: false, featured: false, draft: false });
     expect(parsed.lead).toBeUndefined();
   });
 
   it('принимает карточку на главной с lead', () => {
-    const parsed = productSchema.parse({ ...validStandaloneProduct, featured: true, lead: 'Текст карточки.' });
+    const parsed = product.parse({ ...validStandaloneProduct, featured: true, lead: 'Текст карточки.' });
     expect(parsed).toMatchObject({ featured: true, lead: 'Текст карточки.' });
   });
 
   it('отклоняет featured без lead', () => {
-    expect(issuePaths(productSchema, { ...validStandaloneProduct, featured: true })).toEqual(['lead']);
+    expect(issuePaths(product, { ...validStandaloneProduct, featured: true })).toEqual(['lead']);
   });
 
   it('принимает lead без featured', () => {
-    expect(productSchema.safeParse({ ...validStandaloneProduct, lead: 'Лид страницы.' }).success).toBe(true);
+    expect(product.safeParse({ ...validStandaloneProduct, lead: 'Лид страницы.' }).success).toBe(true);
   });
 
   it('ограничивает lead лимитом leadMax', () => {
-    expectLimit(productSchema, (lead) => ({ ...validStandaloneProduct, lead }), LIMITS.leadMax, 'lead');
+    expectLimit(product, (lead) => ({ ...validStandaloneProduct, lead }), LIMITS.leadMax, 'lead');
   });
 
   it('принимает черновую страницу у продукта со страницей', () => {
-    const parsed = productSchema.parse({ ...validPlatformProduct, draft: false, pageDraft: true });
+    const parsed = product.parse({ ...validPlatformProduct, draft: false, pageDraft: true });
     expect(parsed).toMatchObject({ hasPage: true, pageDraft: true, draft: false });
   });
 
   it('отклоняет pageDraft без hasPage — и явный false, и по умолчанию', () => {
-    expect(issuePaths(productSchema, { ...validPlatformProduct, hasPage: false, pageDraft: true })).toEqual(['pageDraft']);
-    expect(issuePaths(productSchema, { ...validStandaloneProduct, pageDraft: true })).toEqual(['pageDraft']);
+    expect(issuePaths(product, { ...validPlatformProduct, hasPage: false, pageDraft: true })).toEqual(['pageDraft']);
+    expect(issuePaths(product, { ...validStandaloneProduct, pageDraft: true })).toEqual(['pageDraft']);
   });
 
   it('отклоняет неверный kind', () => {
-    expect(issuePaths(productSchema, { ...validStandaloneProduct, kind: 'module' })).toContain('kind');
+    expect(issuePaths(product, { ...validStandaloneProduct, kind: 'module' })).toContain('kind');
   });
 
   it('отклоняет платформенный продукт без mapOrder', () => {
     const { mapOrder: _, ...withoutOrder } = validPlatformProduct;
-    expect(issuePaths(productSchema, withoutOrder)).toEqual(['mapOrder']);
+    expect(issuePaths(product, withoutOrder)).toEqual(['mapOrder']);
   });
 
   it('отклоняет отдельный продукт с mapOrder', () => {
-    expect(issuePaths(productSchema, { ...validStandaloneProduct, mapOrder: 9 })).toEqual(['mapOrder']);
+    expect(issuePaths(product, { ...validStandaloneProduct, mapOrder: 9 })).toEqual(['mapOrder']);
   });
 
   it('отклоняет mapOrder не больше нуля и дробный', () => {
-    expect(issuePaths(productSchema, { ...validPlatformProduct, mapOrder: 0 })).toContain('mapOrder');
-    expect(issuePaths(productSchema, { ...validPlatformProduct, mapOrder: 1.5 })).toContain('mapOrder');
+    expect(issuePaths(product, { ...validPlatformProduct, mapOrder: 0 })).toContain('mapOrder');
+    expect(issuePaths(product, { ...validPlatformProduct, mapOrder: 1.5 })).toContain('mapOrder');
   });
 
   it('отклоняет имя без префикса «Belka »', () => {
-    expect(issuePaths(productSchema, { ...validPlatformProduct, name: 'WMS' })).toContain('name');
-    expect(issuePaths(productSchema, { ...validPlatformProduct, name: 'BelkaWMS' })).toContain('name');
+    expect(issuePaths(product, { ...validPlatformProduct, name: 'WMS' })).toContain('name');
+    expect(issuePaths(product, { ...validPlatformProduct, name: 'BelkaWMS' })).toContain('name');
   });
 
   it('ограничивает summary 140 символами', () => {
-    expect(productSchema.safeParse({ ...validPlatformProduct, summary: 'я'.repeat(140) }).success).toBe(true);
-    expect(issuePaths(productSchema, { ...validPlatformProduct, summary: 'я'.repeat(141) })).toContain('summary');
+    expect(product.safeParse({ ...validPlatformProduct, summary: 'я'.repeat(140) }).success).toBe(true);
+    expect(issuePaths(product, { ...validPlatformProduct, summary: 'я'.repeat(141) })).toContain('summary');
   });
 
   it('отклоняет неизвестные domain и readiness', () => {
-    const paths = issuePaths(productSchema, { ...validPlatformProduct, domain: 'retail', readiness: 'done' });
+    const paths = issuePaths(product, { ...validPlatformProduct, domain: 'retail', readiness: 'done' });
     expect(paths).toEqual(expect.arrayContaining(['domain', 'readiness']));
   });
 
   it('ограничивает seo.title 60 и seo.description 160 символами', () => {
-    const paths = issuePaths(productSchema, {
+    const paths = issuePaths(product, {
       ...validPlatformProduct,
       seo: { title: 'я'.repeat(61), description: 'я'.repeat(161) },
     });
     expect(paths).toEqual(expect.arrayContaining(['seo.title', 'seo.description']));
+  });
+
+  it('sections по умолчанию — пустой список; поля mockup больше нет', () => {
+    const parsed = product.parse({ ...validPlatformProduct, mockup: 'WmsConsole' });
+    expect(parsed.sections).toEqual([]);
+    expect(parsed).not.toHaveProperty('mockup');
+  });
+
+  it('принимает descriptor, sections и ogImage с ogImageAlt', () => {
+    const parsed = product.parse({
+      ...validPlatformProduct,
+      descriptor: 'система управления складом',
+      sections: ['wms-scope', 'approach'],
+      ogImage: './og-wms.png',
+      ogImageAlt: 'Карточка продукта',
+    });
+    expect(parsed).toMatchObject({ descriptor: 'система управления складом', sections: ['wms-scope', 'approach'] });
+  });
+
+  it('ограничивает descriptor лимитом descriptorMax, пустой — ошибка', () => {
+    expectLimit(product, (descriptor) => ({ ...validPlatformProduct, descriptor }), LIMITS.descriptorMax, 'descriptor');
+    expect(issuePaths(product, { ...validPlatformProduct, descriptor: '' })).toEqual(['descriptor']);
+  });
+
+  it('отклоняет ogImage без ogImageAlt', () => {
+    expect(issuePaths(product, { ...validPlatformProduct, ogImage: './og-wms.png' })).toEqual(['ogImageAlt']);
+  });
+
+  it('ограничивает ogImageAlt лимитом altMax', () => {
+    const withAlt = (ogImageAlt: string) => ({ ...validPlatformProduct, ogImage: './og-wms.png', ogImageAlt });
+    expectLimit(product, withAlt, LIMITS.altMax, 'ogImageAlt');
   });
 });
 
@@ -216,6 +256,7 @@ describe('block', () => {
     list: { view: 'list', title: 'Охват', items: [{ title: 'Процесс' }] },
     'platform-map': { view: 'platform-map', title: 'Состав платформы' },
     products: { view: 'products', title: 'Продукты' },
+    surfaces: validSurfacesBlock,
   } as const;
 
   it('минимальная фикстура есть у каждого вида', () => {
@@ -262,6 +303,29 @@ describe('block', () => {
 
   it.each(['text', 'platform-map', 'products'] as const)('view: %s не принимает пункты', (view) => {
     expect(issuePaths(block, { ...minimal[view], items: [{ title: 'Пункт', text: 'Текст.' }] })).toEqual(['items']);
+  });
+
+  it('view: surfaces требует хотя бы один пункт', () => {
+    const { items: _, ...withoutItems } = validSurfacesBlock;
+    expect(issuePaths(block, withoutItems)).toEqual(['items']);
+    expect(issuePaths(block, { ...validSurfacesBlock, items: [] })).toEqual(['items']);
+  });
+
+  it.each(['text', 'mockup', 'product'] as const)('view: surfaces требует %s у каждого пункта', (field) => {
+    const item = validSurfacesBlock.items[0]!;
+    const { [field]: _, ...withoutField } = item;
+    expect(issuePaths(block, { ...validSurfacesBlock, items: [item, withoutField] })).toEqual([`items.1.${field}`]);
+  });
+
+  it.each([
+    ['cards', 'mockup'],
+    ['cards', 'product'],
+    ['list', 'mockup'],
+    ['list', 'product'],
+    ['steps', 'mockup'],
+  ] as const)('view: %s не принимает %s в пункте', (view, field) => {
+    const items = [{ title: 'Пункт', text: 'Текст.', [field]: 'wms' }];
+    expect(issuePaths(block, { ...minimal[view], items })).toEqual([`items.0.${field}`]);
   });
 
   it('link требует page и label', () => {
@@ -362,5 +426,106 @@ describe('site', () => {
 
   it('требует https в url', () => {
     expect(issuePaths(site, { ...validSite, url: 'http://belkascm.ru' })).toEqual(['url']);
+  });
+
+  it('mockupNote необязателен и ограничен лимитом mockupNoteMax', () => {
+    expect(site.parse(validSite).mockupNote).toBeUndefined();
+    expectLimit(site, (mockupNote) => ({ ...validSite, mockupNote }), LIMITS.mockupNoteMax, 'mockupNote');
+    expect(issuePaths(site, { ...validSite, mockupNote: '' })).toEqual(['mockupNote']);
+  });
+});
+
+describe('mockup', () => {
+  const { console: consoleMockup, terminal, pack, dashboard } = validMockups;
+
+  it('фикстура есть у каждого вида', () => {
+    expect(Object.keys(validMockups)).toEqual([...MOCKUP_KIND_NAMES]);
+    expect(MOCKUP_KIND_NAMES).toEqual(['console', 'terminal', 'pack', 'dashboard']);
+  });
+
+  it.each(MOCKUP_KIND_NAMES)('принимает мокап kind: %s', (kind) => {
+    expect(mockupSchema.parse(validMockups[kind])).toMatchObject({ kind });
+  });
+
+  it('exceptions консоли по умолчанию — пустой список', () => {
+    const { exceptions: _, ...withoutExceptions } = consoleMockup;
+    expect(mockupSchema.parse(withoutExceptions)).toMatchObject({ exceptions: [] });
+  });
+
+  it('отклоняет неизвестный kind и мокап без kind', () => {
+    expect(issuePaths(mockupSchema, { ...consoleMockup, kind: 'gallery' })).toEqual(['kind']);
+    const { kind: _, ...withoutKind } = consoleMockup;
+    expect(issuePaths(mockupSchema, withoutKind)).toEqual(['kind']);
+  });
+
+  it('отклоняет поле чужого вида: cell у console', () => {
+    const result = mockupSchema.safeParse({ ...consoleMockup, cell: 'A-04-12-3' });
+    expect(result.success).toBe(false);
+    expect(result.error!.issues).toMatchObject([{ code: 'unrecognized_keys', keys: ['cell'] }]);
+  });
+
+  it('отклоняет опечатку в необязательном поле: units вместо unit', () => {
+    const kpis = [{ label: 'Показатель', value: 1, units: 'шт.' }, consoleMockup.kpis[1]];
+    const result = mockupSchema.safeParse({ ...consoleMockup, kpis });
+    expect(result.success).toBe(false);
+    expect(result.error!.issues).toMatchObject([{ code: 'unrecognized_keys', keys: ['units'], path: ['kpis', 0] }]);
+  });
+
+  it('держит load и progress в пределах 0…100', () => {
+    const zones = (load: number) => [{ label: 'Зона 1', load }, ...consoleMockup.zones.slice(1)];
+    expect(issuePaths(mockupSchema, { ...consoleMockup, zones: zones(-1) })).toEqual(['zones.0.load']);
+    expect(issuePaths(mockupSchema, { ...consoleMockup, zones: zones(101) })).toEqual(['zones.0.load']);
+    const waves = [{ ...consoleMockup.waves[0], progress: 101 }, consoleMockup.waves[1]];
+    expect(issuePaths(mockupSchema, { ...consoleMockup, waves })).toEqual(['waves.0.progress']);
+    const processes = [{ label: 'Процесс 1', load: -1 }, ...dashboard.processes.slice(1)];
+    expect(issuePaths(mockupSchema, { ...dashboard, processes })).toEqual(['processes.0.load']);
+  });
+
+  it('держит trend в пределах 6…12 точек', () => {
+    const withTrend = (trend: number[]) => ({ ...dashboard, kpis: [{ ...dashboard.kpis[0], trend }, dashboard.kpis[1]] });
+    expect(mockupSchema.safeParse(withTrend(Array(12).fill(1))).success).toBe(true);
+    expect(issuePaths(mockupSchema, withTrend(Array(5).fill(1)))).toEqual(['kpis.0.trend']);
+    expect(issuePaths(mockupSchema, withTrend(Array(13).fill(1)))).toEqual(['kpis.0.trend']);
+  });
+
+  it('держит счётчики списков: nav 4…7, kpis 2…4, lines 3…6, actions 1…3, devices 1…4', () => {
+    expect(issuePaths(mockupSchema, { ...consoleMockup, nav: consoleMockup.nav.slice(0, 3) })).toEqual(['nav']);
+    expect(issuePaths(mockupSchema, { ...consoleMockup, kpis: consoleMockup.kpis.slice(0, 1) })).toEqual(['kpis']);
+    expect(issuePaths(mockupSchema, { ...pack, lines: pack.lines.slice(0, 2) })).toEqual(['lines']);
+    expect(issuePaths(mockupSchema, { ...terminal, actions: [] })).toEqual(['actions']);
+    expect(issuePaths(mockupSchema, { ...pack, devices: [] })).toEqual(['devices']);
+    const exceptions = Array(4).fill({ text: 'Исключение', tone: 'warn' });
+    expect(issuePaths(mockupSchema, { ...consoleMockup, exceptions })).toEqual(['exceptions']);
+  });
+
+  it('отклоняет нечисловое value, дробный qty и неизвестный тон', () => {
+    const kpis = [{ ...consoleMockup.kpis[0], value: '1 284' }, consoleMockup.kpis[1]];
+    expect(issuePaths(mockupSchema, { ...consoleMockup, kpis })).toEqual(['kpis.0.value']);
+    expect(issuePaths(mockupSchema, { ...terminal, take: { ...terminal.take, qty: 1.5 } })).toEqual(['take.qty']);
+    expect(issuePaths(mockupSchema, { ...pack, devices: [{ label: 'Весы', tone: 'error' }] })).toEqual(['devices.0.tone']);
+  });
+
+  it.each([
+    ['caption', LIMITS.captionMax, (v: string) => ({ ...consoleMockup, caption: v })],
+    ['app', LIMITS.mockLabelMax, (v: string) => ({ ...consoleMockup, app: v })],
+    ['screen', LIMITS.mockLabelMax, (v: string) => ({ ...terminal, screen: v })],
+    ['nav.0', LIMITS.mockLabelMax, (v: string) => ({ ...consoleMockup, nav: [v, ...consoleMockup.nav.slice(1)] })],
+    ['waves.0.status.label', LIMITS.mockLabelMax, (v: string) => ({
+      ...consoleMockup,
+      waves: [{ ...consoleMockup.waves[0], status: { label: v, tone: 'ok' } }, consoleMockup.waves[1]],
+    })],
+    ['take.unit', LIMITS.mockLabelMax, (v: string) => ({ ...terminal, take: { ...terminal.take, unit: v } })],
+    ['hourly.points.0.hour', LIMITS.mockLabelMax, (v: string) => ({
+      ...dashboard,
+      hourly: { ...dashboard.hourly, points: [{ hour: v, value: 1 }, ...dashboard.hourly.points.slice(1)] },
+    })],
+    ['waves.0.code', LIMITS.mockCodeMax, (v: string) => ({
+      ...consoleMockup,
+      waves: [{ ...consoleMockup.waves[0], code: v }, consoleMockup.waves[1]],
+    })],
+    ['cell', LIMITS.mockCodeMax, (v: string) => ({ ...terminal, cell: v })],
+    ['scan.last', LIMITS.mockCodeMax, (v: string) => ({ ...pack, scan: { ...pack.scan, last: v } })],
+  ] as const)('ограничивает %s лимитом (%i символов)', (path, max, build) => {
+    expectLimit(mockupSchema, build, max, path);
   });
 });
