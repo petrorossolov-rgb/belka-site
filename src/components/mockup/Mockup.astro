@@ -83,13 +83,15 @@ if (scenario && site.mockupPauseLabel === undefined) throw new Error(`мокап
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    /* В DOM флажок перед экраном (для `~`), на экране — под ним, рядом с подписью фигуры. */
+    /* В DOM флажок перед экраном (для `~`), на экране — под ним, строкой над подписью фигуры:
+       на узкой фигуре подпись не делит строку с переключателем. */
     .mockup:has(> .mockup__motion) {
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: auto minmax(0, 1fr);
       grid-template-areas:
-        'screen screen screen'
-        'caption motion pause';
-      align-items: start;
+        'screen screen'
+        'motion pause'
+        'caption caption';
+      align-items: center;
     }
 
     .mockup:has(> .mockup__motion) > .mockup__screen {
