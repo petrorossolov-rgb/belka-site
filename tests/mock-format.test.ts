@@ -2,7 +2,7 @@
 // `check-voice`. Особые символы в ожиданиях — через String.fromCharCode, как в модуле.
 import { describe, expect, it } from 'vitest';
 import { checkText } from '../scripts/check-voice.mjs';
-import { decimal, groupDigits, percent, withUnit } from '../src/lib/mock-format';
+import { decimal, groupDigits, ofTotal, percent, withUnit } from '../src/lib/mock-format';
 
 const THIN = String.fromCharCode(0x2009);
 const NARROW = String.fromCharCode(0x202f);
@@ -113,5 +113,14 @@ describe('withUnit', () => {
 
   it('проходит checkText (V4)', () => {
     expect(checkText(`Значение ${withUnit(12500, 'шт.')} на экране`)).toEqual([]);
+  });
+});
+
+describe('ofTotal', () => {
+  it('«сделано / всего» с разрядами у каждого числа и проходит checkText (T21)', () => {
+    expect(ofTotal(3, 8)).toBe('3 / 8');
+    expect(ofTotal(12500, 20000)).toBe(`12${THIN}500 / 20${THIN}000`);
+    expect(checkText(`Прогресс ${ofTotal(12500, 20000)} на экране`)).toEqual([]);
+    expect(() => ofTotal(1.5, 3)).toThrow(/mock-format/);
   });
 });

@@ -2,7 +2,7 @@
 // Вид `terminal` — ТСД Belka WMS, шаг отбора: номер шага и сегментный прогресс, адрес ячейки
 // крупнее всего, товар, «взять» с количеством, поле скана и действия. Тёмная палитра ТСД; корпус
 // не шире `--mock-device-max`, поэтому на любой ширине фигуры экран один к одному. Строк нет.
-import { withUnit } from '../../../lib/mock-format';
+import { ofTotal, withUnit } from '../../../lib/mock-format';
 import type { MockupOf } from '../kinds';
 import DeviceFrame from '../ui/DeviceFrame.astro';
 import FakeButton from '../ui/FakeButton.astro';
@@ -24,7 +24,7 @@ const { app, screen, step, cell, item, take, progress, scan, actions } = Astro.p
           <span data-voice="raw">{step.code}</span>
         </div>
         <div class="terminal__step-label">{step.label}</div>
-        <div class="terminal__count">{`${progress.done} / ${progress.total}`}</div>
+        <div class="terminal__count">{ofTotal(progress.done, progress.total)}</div>
       </div>
       <Progress segments={progress} dark />
     </div>

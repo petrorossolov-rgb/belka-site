@@ -16,7 +16,9 @@ const site = await getSite();
 // Сужение объединения видов до компонента своего вида TypeScript через индекс не выводит:
 // карта типизирована по видам (`MOCKUP_KINDS`), здесь вид и данные берутся из одной записи.
 const Kind = MOCKUP_KINDS[data.kind] as (props: { mockup: Mockup['data'] }) => unknown;
-const caption = site.mockupNote === undefined ? data.caption : `${data.caption} ${site.mockupNote}`;
+// Подпись о демо-данных обязательна (правило целостности 5); без неё фигура не выводится молча.
+if (site.mockupNote === undefined) throw new Error(`мокап «${Astro.props.mockup.id}»: в site.yaml нет mockupNote`);
+const caption = `${data.caption} ${site.mockupNote}`;
 ---
 
 <figure class="mockup">

@@ -2,7 +2,7 @@
 // Вид `pack` — упаковочный стол Belka WMS: заказ и статусы устройств в шапке, строки заказа,
 // поле скана и текущее место с весом. Широкая фигура (от 38rem) — строки слева, скан и место
 // справа; узкая — сначала скан и текущее место, затем до четырёх строк. Строк нет.
-import { NUMBER_FORMS, withUnit } from '../../../lib/mock-format';
+import { NUMBER_FORMS, ofTotal, withUnit } from '../../../lib/mock-format';
 import type { MockupOf } from '../kinds';
 import Panel from '../ui/Panel.astro';
 import ScanField from '../ui/ScanField.astro';
@@ -39,7 +39,7 @@ const { app, screen, panels, order, scan, place, lines, devices } = Astro.props.
                 <div class="pack__line-code">
                   <span data-voice="raw">{line.code}</span>
                 </div>
-                <div class="pack__line-qty">{`${line.packed} / ${line.qty}`}</div>
+                <div class="pack__line-qty">{ofTotal(line.packed, line.qty)}</div>
               </div>
             ))
           }
