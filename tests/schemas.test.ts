@@ -498,6 +498,13 @@ describe('mockup', () => {
     expect(issuePaths(mockupSchema, { ...consoleMockup, exceptions })).toEqual(['exceptions']);
   });
 
+  it('заголовки панелей консоли обязательны и строгие (ep03 T12)', () => {
+    const { panels: _, ...withoutPanels } = consoleMockup;
+    expect(issuePaths(mockupSchema, withoutPanels)).toEqual(['panels']);
+    const { exceptions: _e, ...partial } = consoleMockup.panels;
+    expect(issuePaths(mockupSchema, { ...consoleMockup, panels: partial })).toEqual(['panels.exceptions']);
+  });
+
   it('отклоняет нечисловое value, дробный qty и неизвестный тон', () => {
     const kpis = [{ ...consoleMockup.kpis[0], value: '1 284' }, consoleMockup.kpis[1]];
     expect(issuePaths(mockupSchema, { ...consoleMockup, kpis })).toEqual(['kpis.0.value']);
@@ -523,6 +530,7 @@ describe('mockup', () => {
       ...consoleMockup,
       waves: [{ ...consoleMockup.waves[0], code: v }, consoleMockup.waves[1]],
     })],
+    ['panels.waves', LIMITS.mockLabelMax, (v: string) => ({ ...consoleMockup, panels: { ...consoleMockup.panels, waves: v } })],
     ['cell', LIMITS.mockCodeMax, (v: string) => ({ ...terminal, cell: v })],
     ['scan.last', LIMITS.mockCodeMax, (v: string) => ({ ...pack, scan: { ...pack.scan, last: v } })],
   ] as const)('ограничивает %s лимитом (%i символов)', (path, max, build) => {

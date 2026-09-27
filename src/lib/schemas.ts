@@ -272,6 +272,8 @@ export const mockupSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('console'),
     ...mockupBase,
+    // Заголовки панелей экрана: в шаблоне кита строк нет (ep03 T12).
+    panels: z.strictObject({ zones: mockLabel, waves: mockLabel, exceptions: mockLabel }),
     nav: z.array(mockLabel).min(4).max(7),
     kpis: z
       .array(z.strictObject({ label: mockLabel, value: z.number(), unit: mockLabel.optional() }))

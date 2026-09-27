@@ -53,7 +53,7 @@ const NBSP = String.fromCharCode(0xa0);
 export type NumberForm = 'count' | 'percent' | 'decimal';
 
 /** Число в своей форме и единица из данных через неразрывный пробел; у процента единица — знак. */
-export function withUnit(n: number, form: NumberForm = 'count', unit?: string): string {
+export function withUnit(n: number, unit?: string, form: NumberForm = 'count'): string {
   if (form === 'percent') return percent(n);
   const value = form === 'decimal' ? decimal(n) : groupDigits(n);
   return unit === undefined || unit === '' ? value : `${value}${NBSP}${unit}`;

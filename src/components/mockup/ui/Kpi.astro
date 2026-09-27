@@ -16,7 +16,7 @@ const { label, value, unit, form = 'count', dark = false } = Astro.props;
 
 <div class:list={['kpi', { 'kpi--dark': dark }]}>
   <div class="kpi__label">{label}</div>
-  <div class="kpi__value">{withUnit(value, form, unit)}</div>
+  <div class="kpi__value">{withUnit(value, unit, form)}</div>
   <slot />
 </div>
 
