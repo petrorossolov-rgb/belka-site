@@ -1,14 +1,171 @@
 ---
-// Вид `pack` (упаковочный стол): минимальный вид до T12/T13 — рамка с приложением и экраном. Строк нет:
-// всё приходит из данных мокапа (`src/content/mockups/*.yaml`).
-import WindowFrame from '../ui/WindowFrame.astro';
+// Вид `pack` — упаковочный стол Belka WMS: заказ и статусы устройств в шапке, строки заказа,
+// поле скана и текущее место с весом. Широкая фигура (от 38rem) — строки слева, скан и место
+// справа; узкая — сначала скан и текущее место, затем до четырёх строк. Строк нет.
+import { NUMBER_FORMS, withUnit } from '../../../lib/mock-format';
 import type { MockupOf } from '../kinds';
+import Panel from '../ui/Panel.astro';
+import ScanField from '../ui/ScanField.astro';
+import StatusPill from '../ui/StatusPill.astro';
+import WindowFrame from '../ui/WindowFrame.astro';
 
 interface Props {
   mockup: MockupOf<'pack'>;
 }
 
-const { mockup } = Astro.props;
+const { app, screen, panels, order, scan, place, lines, devices } = Astro.props.mockup;
 ---
 
-<WindowFrame app={mockup.app} screen={mockup.screen} />
+<WindowFrame app={app} screen={screen}>
+  <div class="pack">
+    <div class="pack__head">
+      <div class="pack__order">
+        <div class="pack__order-label">{order.label}</div>
+        <div class="pack__code">
+          <span data-voice="raw">{order.code}</span>
+        </div>
+      </div>
+      <div class="pack__devices">
+        {devices.map((device) => <StatusPill label={device.label} tone={device.tone} />)}
+      </div>
+    </div>
+    <div class="pack__work">
+      <div class="pack__lines">
+        <Panel title={panels.lines}>
+          {
+            lines.map((line) => (
+              <div class:list={['pack__line', { 'pack__line--done': line.packed === line.qty }]}>
+                <div class="pack__line-label">{line.label}</div>
+                <div class="pack__line-code">
+                  <span data-voice="raw">{line.code}</span>
+                </div>
+                <div class="pack__line-qty">{`${line.packed} / ${line.qty}`}</div>
+              </div>
+            ))
+          }
+        </Panel>
+      </div>
+      <div class="pack__side">
+        <ScanField label={scan.label} value={scan.last} />
+        <Panel title={place.label}>
+          <div class="pack__place">
+            <div class="pack__code">
+              <span data-voice="raw">{place.code}</span>
+            </div>
+            <div class="pack__weight">{withUnit(place.weight, place.unit, NUMBER_FORMS.decimal)}</div>
+          </div>
+        </Panel>
+      </div>
+    </div>
+  </div>
+</WindowFrame>
+
+<style>
+  .pack {
+    display: grid;
+    gap: var(--mock-pad);
+    min-width: 0;
+  }
+
+  .pack__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .pack__order {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    align-items: baseline;
+  }
+
+  .pack__order-label {
+    color: var(--mock-text-muted);
+  }
+
+  .pack__code {
+    font-family: var(--font-code);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .pack__devices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-dot-gap);
+  }
+
+  .pack__work,
+  .pack__side,
+  .pack__lines {
+    display: grid;
+    align-content: start;
+    gap: var(--mock-pad);
+    min-width: 0;
+  }
+
+  .pack__line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: var(--mock-gap);
+    align-items: center;
+    min-height: var(--mock-row-h);
+    padding-inline-start: var(--mock-gap);
+    border-inline-start: var(--mock-mark-w) solid var(--mock-line-strong);
+    border-block-end: var(--border-width) solid var(--mock-line);
+  }
+
+  .pack__line--done {
+    border-inline-start-color: var(--mock-tone-ok-fg);
+  }
+
+  .pack__line-code {
+    color: var(--mock-text-muted);
+    font-family: var(--font-code);
+  }
+
+  .pack__line-qty {
+    font-weight: var(--font-weight-bold);
+    text-align: end;
+  }
+
+  .pack__place {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .pack__weight {
+    font-size: var(--mock-font-lg);
+    font-weight: var(--font-weight-heavy);
+  }
+
+  /* Узкая фигура: скан и текущее место — первыми, строк — не больше четырёх, без артикулов. */
+  @container (width < 38rem) {
+    .pack__side {
+      order: -1;
+    }
+
+    .pack__line {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .pack__line:nth-child(n + 5) {
+      display: none;
+    }
+
+    .pack__line-code {
+      display: none;
+    }
+  }
+
+  @container (width >= 38rem) {
+    .pack__work {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+  }
+</style>
