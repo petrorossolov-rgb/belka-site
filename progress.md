@@ -67,7 +67,7 @@
 ## Docs Debt
 <!-- Items logged by /my-execute, /my-change, /my-incident. Resolved by /my-sync-docs. -->
 
-- [ ] 2026-09-27 Update `docs/runbooks/text-review.md` (шаг 3, ревью Codex `text`) — в первом промпте просить таблицу «фрагмент → источник → статус»: в ep04 T11 первый ответ был 🟢 без находок, пофразовая проверка дала 3 major и 2 minor; в T15 так же вёл себя режим `code`. В `add-product.md` шаг 8 уже сказано (ep04 T16).
+- [x] 2026-09-27 ~~Update `docs/runbooks/text-review.md` (шаг 3, ревью Codex `text`) — в первом промпте просить таблицу «фрагмент → источник → статус»: в ep04 T11 первый ответ был 🟢 без находок, пофразовая проверка дала 3 major и 2 minor; в T15 так же вёл себя режим `code`. В `add-product.md` шаг 8 уже сказано (ep04 T16).~~ — закрыто retro ep04 (развилка A): `text-review.md` шаг 3, п. 5; таблица сверки для `code` и `text` — в `REVIEWER.md → «Формат отчёта»`.
 
 ## Follow-ups
 <!-- Tasks deferred from /my-incident or /my-change that need proper implementation later. -->
