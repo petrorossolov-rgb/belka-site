@@ -1,7 +1,7 @@
 ---
 name: Belka Analytics
 # Пояснение имени — подпись пункта блока поверхностей на главной; заглушка до утверждения пакета ep03 (T19).
-descriptor: "Заглушка ep03: пояснение имени"
+descriptor: "Пробный текст: пояснение имени"
 short: Analytics
 domain: analytics
 kind: platform
