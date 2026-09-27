@@ -11,6 +11,8 @@ hero:
 sections:
   - platform
   - products
+  # Блок поверхностей (ep03): черновик до T22; место — предложение, утверждается в пакете текстов.
+  - surfaces
   - theses
   - wms-scope
   - approach

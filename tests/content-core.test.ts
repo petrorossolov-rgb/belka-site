@@ -12,6 +12,7 @@ import {
   isLinkable,
   pageHref,
   resolveSections,
+  surfaceLink,
   showsDrafts,
   visibleContacts,
   visibleLegal,
@@ -718,5 +719,27 @@ describe('функции подвала', () => {
     expect(visibleLegal({ legal: { entityName: '', inn: ' ', ogrn: '1027700000000', address: '' } })).toEqual([
       { key: 'ogrn', text: 'ОГРН 1027700000000' },
     ]);
+  });
+});
+
+describe('surfaceLink — ссылка пункта поверхностей', () => {
+  const wms = product('wms', { hasPage: true });
+  const analytics = product('analytics', { mapOrder: 6 });
+  const pages = [wms];
+
+  it('собранная страница продукта и другой адрес — ссылка', () => {
+    expect(surfaceLink({ id: 'wms' }, pages, '/')).toBe('/products/wms/');
+    expect(surfaceLink({ id: 'wms' }, pages, '/products/')).toBe('/products/wms/');
+  });
+
+  it('текущая страница — без ссылки на саму себя', () => {
+    expect(surfaceLink({ id: 'wms' }, pages, '/products/wms/')).toBeUndefined();
+  });
+
+  it('страницы нет (Analytics, черновая страница в production) — без ссылки', () => {
+    expect(surfaceLink({ id: analytics.id }, pages, '/')).toBeUndefined();
+    const draftPage = product('wms', { hasPage: true, pageDraft: true });
+    expect(surfaceLink({ id: 'wms' }, getProductPages([draftPage], 'production'), '/')).toBeUndefined();
+    expect(surfaceLink({ id: 'wms' }, getProductPages([draftPage], 'staging'), '/')).toBe('/products/wms/');
   });
 });

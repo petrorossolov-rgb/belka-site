@@ -162,6 +162,16 @@ export function isLinkable(product: RefLike, productPages: readonly RefLike[]): 
 }
 
 /**
+ * Ссылка пункта поверхностей (`view: surfaces`) на страницу продукта: только если страница
+ * собрана (`isLinkable`) и это не текущая страница — на странице WMS её пункты на себя не ведут.
+ */
+export function surfaceLink(product: RefLike, productPages: readonly RefLike[], currentPath: string): string | undefined {
+  if (!isLinkable(product, productPages)) return undefined;
+  const href = productHref(product.id);
+  return href === currentPath ? undefined : href;
+}
+
+/**
  * Секции страницы или продукта в порядке `sections`; в production черновые блоки исключены.
  * Отсутствующий блок — ошибка (целостность ловит её раньше, здесь — страховка рендера).
  */
