@@ -84,6 +84,7 @@ export const validMockups = {
     caption: 'Подпись фигуры.',
     app: 'Консоль',
     screen: 'Монитор',
+    panels: { zones: 'Панель 1', waves: 'Панель 2', exceptions: 'Панель 3' },
     nav: ['Раздел 1', 'Раздел 2', 'Раздел 3', 'Раздел 4'],
     kpis: [
       { label: 'Показатель 1', value: 1284, unit: 'шт.' },

@@ -1,14 +1,138 @@
 ---
-// Вид `terminal` (ТСД): минимальный вид до T12/T13 — рамка с приложением и экраном. Строк нет:
-// всё приходит из данных мокапа (`src/content/mockups/*.yaml`).
-import DeviceFrame from '../ui/DeviceFrame.astro';
+// Вид `terminal` — ТСД Belka WMS, шаг отбора: номер шага и сегментный прогресс, адрес ячейки
+// крупнее всего, товар, «взять» с количеством, поле скана и действия. Тёмная палитра ТСД; корпус
+// не шире `--mock-device-max`, поэтому на любой ширине фигуры экран один к одному. Строк нет.
+import { withUnit } from '../../../lib/mock-format';
 import type { MockupOf } from '../kinds';
+import DeviceFrame from '../ui/DeviceFrame.astro';
+import FakeButton from '../ui/FakeButton.astro';
+import Progress from '../ui/Progress.astro';
+import ScanField from '../ui/ScanField.astro';
 
 interface Props {
   mockup: MockupOf<'terminal'>;
 }
 
-const { mockup } = Astro.props;
+const { app, screen, step, cell, item, take, progress, scan, actions } = Astro.props.mockup;
 ---
 
-<DeviceFrame app={mockup.app} screen={mockup.screen} />
+<DeviceFrame app={app} screen={screen}>
+  <div class="terminal">
+    <div class="terminal__step">
+      <div class="terminal__step-head">
+        <div class="terminal__step-code">
+          <span data-voice="raw">{step.code}</span>
+        </div>
+        <div class="terminal__step-label">{step.label}</div>
+        <div class="terminal__count">{`${progress.done} / ${progress.total}`}</div>
+      </div>
+      <Progress segments={progress} dark />
+    </div>
+    <div class="terminal__cell">
+      <span data-voice="raw">{cell}</span>
+    </div>
+    <div class="terminal__item">
+      <div class="terminal__item-label">{item.label}</div>
+      <div class="terminal__item-code">
+        <span data-voice="raw">{item.code}</span>
+      </div>
+    </div>
+    <div class="terminal__take">
+      <div class="terminal__take-label">{take.label}</div>
+      <div class="terminal__take-qty">{withUnit(take.qty, take.unit)}</div>
+    </div>
+    <ScanField label={scan} dark />
+    <div class="terminal__actions">
+      {actions.map((action) => <FakeButton label={action} dark />)}
+    </div>
+  </div>
+</DeviceFrame>
+
+<style>
+  .terminal {
+    display: grid;
+    gap: var(--mock-pad);
+    min-width: 0;
+  }
+
+  .terminal__step {
+    display: grid;
+    gap: var(--mock-gap);
+  }
+
+  .terminal__step-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    align-items: baseline;
+  }
+
+  .terminal__step-code {
+    color: var(--mock-terminal-accent);
+    font-family: var(--font-code);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .terminal__step-label {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .terminal__count {
+    margin-inline-start: auto;
+    color: var(--mock-terminal-muted);
+  }
+
+  .terminal__cell {
+    color: var(--mock-terminal-accent);
+    font-family: var(--font-code);
+    font-size: var(--mock-font-xl);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--leading-tight);
+    overflow-wrap: anywhere;
+  }
+
+  .terminal__item {
+    display: grid;
+    gap: var(--mock-dot-gap);
+    padding: var(--mock-pad);
+    border: var(--border-width) solid var(--mock-terminal-line);
+    border-radius: var(--mock-radius);
+    background: var(--mock-terminal-panel);
+  }
+
+  .terminal__item-label {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .terminal__item-code {
+    color: var(--mock-terminal-muted);
+    font-family: var(--font-code);
+    overflow-wrap: anywhere;
+  }
+
+  .terminal__take {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .terminal__take-label {
+    color: var(--mock-terminal-muted);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .terminal__take-qty {
+    color: var(--mock-terminal-accent);
+    font-size: var(--mock-font-xl);
+    font-weight: var(--font-weight-heavy);
+    line-height: var(--leading-tight);
+  }
+
+  .terminal__actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--mock-gap);
+  }
+</style>

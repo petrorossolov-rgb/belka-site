@@ -40,6 +40,9 @@ const caption = site.mockupNote === undefined ? data.caption : `${data.caption} 
     font-family: var(--font-body);
     font-size: var(--mock-font);
     line-height: var(--leading-snug);
+
+    /* Подпись одним словом до mockLabelMax переносится, а не выталкивает фигуру за окно. */
+    overflow-wrap: anywhere;
   }
 
   .mockup__caption {
