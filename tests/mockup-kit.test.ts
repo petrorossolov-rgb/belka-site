@@ -8,19 +8,45 @@
 // ESTree + JSX, и литерал внутри выражения (`{items.map(() => <span>OK</span>)}`) виден как
 // `JSXText`. Вырезание `{…}` перед `parse5` такой текст теряло бы. Обновление Astro, сменившее
 // форму AST, уронит этот тест, а не пропустит нарушение: проба ниже проверяет каждое правило.
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+//
+// Вид со сценарием (ep04, `SCENARIO_KINDS`) — осознанное расширение с пробами; для остальных
+// файлов кита правила прежние. Файл вида находится по соглашению `kinds/{PascalCase(kind)}.astro`,
+// оно проверяется для каждого значения `MOCKUP_KIND_NAMES`. Три правила:
+// (1) `infinite` — только в файле вида из `SCENARIO_KINDS` и только внутри
+//     `@media (prefers-reduced-motion: no-preference)`; «любая анимация — только под
+//     `no-preference`» действует для всех файлов, как раньше;
+// (2) `input` (только `type="checkbox"`) и `label` — флажок паузы — только в `Mockup.astro`, вне
+//     обёртки `aria-hidden`/`inert` и внутри условного выражения (`&&` или ветка «то»
+//     тернарного) по переменной, чей инициализатор во frontmatter ссылается на `SCENARIO_KINDS`;
+//     в остальных файлах кита эти теги ловит прежнее правило тегов;
+// (3) в файле вида из `SCENARIO_KINDS` каждое правило CSS с `animation` или `animation-name`
+//     содержит `animation-play-state: var(--mock-play, …)` после последнего
+//     сокращённого `animation`: сокращение сбрасывает паузу в `running`.
+import { cpSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from '@astrojs/compiler-rs';
 import { afterEach, describe, expect, it } from 'vitest';
+import { MOCKUP_KIND_NAMES, SCENARIO_KINDS } from '../src/lib/schemas';
 
 const KIT = fileURLToPath(new URL('../src/components/mockup/', import.meta.url));
 const FIGURE = 'Mockup.astro';
 
+/** Файл вида по соглашению: `packflow` → `kinds/Packflow.astro`. */
+const kindFile = (kind: string) =>
+  `kinds/${kind
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('')}.astro`;
+const KIND_FILES = new Map<string, string>(MOCKUP_KIND_NAMES.map((kind) => [kindFile(kind), kind]));
+const SCENARIO_FILES = new Set<string>(SCENARIO_KINDS.map(kindFile));
+
 /** Теги HTML внутри кита; `figure`/`figcaption` — только в `Mockup.astro`. */
 const KIT_TAGS = new Set(['div', 'span', 'slot', 'style']);
 const FIGURE_TAGS = new Set(['figure', 'figcaption']);
+/** Флажок паузы вида со сценарием — только в `Mockup.astro`, правило 2. */
+const PAUSE_TAGS = new Set(['input', 'label']);
 /**
  * Атрибуты, значение которых читает человек или скринридер, и директивы Astro, которые выводят
  * строку как содержимое элемента (`set:html`, `set:text`).
@@ -131,17 +157,129 @@ function withoutMotionQueries(css: string): string {
   return out;
 }
 
-/** Нарушения стилей кита в тексте `<style>`. */
-function styleViolations(css: string): string[] {
+type CssRule = { selector: string; declarations: [string, string][] };
+
+/**
+ * Правила CSS с собственными объявлениями. Правило с анимацией — по точному имени свойства
+ * (`animation`, `animation-name`): `animation-timing-function` ключевого кадра его не делает.
+ */
+function cssRules(code: string): CssRule[] {
+  const rules: CssRule[] = [];
+  const stack: { selector: string; own: string }[] = [{ selector: '', own: '' }];
+  let buffer = '';
+  for (const char of code) {
+    if (char === '{') {
+      const cut = buffer.lastIndexOf(';') + 1;
+      stack.at(-1)!.own += buffer.slice(0, cut);
+      stack.push({ selector: buffer.slice(cut).trim().replace(/\s+/g, ' '), own: '' });
+      buffer = '';
+    } else if (char === '}') {
+      const block = stack.pop()!;
+      const declarations = (block.own + buffer)
+        .split(';')
+        .map((d) => d.split(':'))
+        .filter((parts) => parts.length > 1)
+        .map(([name, ...value]) => [name!.trim().toLowerCase(), value.join(':').trim()] as [string, string]);
+      if (declarations.length > 0) rules.push({ selector: block.selector, declarations });
+      buffer = '';
+    } else {
+      buffer += char;
+    }
+  }
+  return rules;
+}
+
+/** Правило 3: у правила с анимацией есть пауза из `--mock-play` после последнего `animation`. */
+function pausable({ declarations }: CssRule): boolean {
+  const names = declarations.map(([name]) => name);
+  if (!names.some((name) => name === 'animation' || name === 'animation-name')) return true;
+  const shorthand = names.lastIndexOf('animation');
+  return declarations.some(
+    ([name, value], i) => name === 'animation-play-state' && i > shorthand && /^var\(\s*--mock-play\s*[,)]/.test(value),
+  );
+}
+
+/** Нарушения стилей кита в тексте `<style>` файла `file`. */
+function styleViolations(css: string, file: string): string[] {
   const code = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const errors: string[] = [];
   if (/text-overflow\s*:/.test(code)) errors.push('text-overflow — многоточие прячет данные');
   for (const match of code.matchAll(/overflow(?:-x|-y|-inline|-block)?\s*:\s*([^;}]+)/g)) {
     if (/\b(hidden|auto|scroll|clip)\b/.test(match[1]!)) errors.push(`overflow: ${match[1]!.trim()} — данные не прячутся и не прокручиваются`);
   }
-  if (/\binfinite\b/.test(code)) errors.push('бесконечная анимация (infinite)');
+  if (SCENARIO_FILES.has(file)) {
+    if (/\binfinite\b/.test(withoutMotionQueries(code))) {
+      errors.push('infinite вне @media (prefers-reduced-motion: no-preference) — цикл только при движении');
+    }
+    for (const rule of cssRules(code).filter((r) => !pausable(r))) {
+      errors.push(`правило «${rule.selector}» с анимацией без animation-play-state: var(--mock-play, …) после animation — пауза не действует`);
+    }
+  } else if (/\binfinite\b/.test(code)) {
+    const kind = KIND_FILES.get(file);
+    errors.push(kind ? `бесконечная анимация (infinite) — вид «${kind}» не из SCENARIO_KINDS` : 'бесконечная анимация (infinite)');
+  }
   if (/@keyframes|animation(?:-name)?\s*:/.test(withoutMotionQueries(code))) {
     errors.push('анимация вне @media (prefers-reduced-motion: no-preference)');
+  }
+  return errors;
+}
+
+/** Переменные frontmatter, чей инициализатор ссылается на `SCENARIO_KINDS`. */
+function scenarioVariables(frontmatter: unknown): Set<string> {
+  const names = new Set<string>();
+  for (const node of nodes(frontmatter)) {
+    if (node.type !== 'VariableDeclarator' || (node.id as Node).type !== 'Identifier') continue;
+    if ([...nodes(node.init)].some((n) => n.type === 'Identifier' && n.name === 'SCENARIO_KINDS')) names.add(String((node.id as Node).name));
+  }
+  return names;
+}
+
+/** Все узлы поддерева с цепочкой предков. */
+function* nodesWithAncestors(value: unknown, ancestors: Node[] = []): Generator<[Node, Node[]]> {
+  if (Array.isArray(value)) {
+    for (const item of value) yield* nodesWithAncestors(item, ancestors);
+  } else if (isNode(value)) {
+    yield [value, ancestors];
+    const path = [...ancestors, value];
+    for (const [key, child] of Object.entries(value)) if (key !== 'type') yield* nodesWithAncestors(child, path);
+  }
+}
+
+const unwrap = (node: Node): Node => (node.type === 'ParenthesizedExpression' ? unwrap(node.expression as Node) : node);
+
+/**
+ * Правило 2: ближайшее выражение-контейнер над элементом — `x && …` или ветка «то» у `x ? … : …`,
+ * где `x` — переменная из `SCENARIO_KINDS`.
+ */
+function underScenario(ancestors: Node[], variables: Set<string>): boolean {
+  const container = ancestors.findLast((n) => n.type === 'JSXExpressionContainer');
+  if (!container) return false;
+  const expression = unwrap(container.expression as Node);
+  const isScenario = (test: unknown) => isNode(test) && test.type === 'Identifier' && variables.has(String(test.name));
+  if (expression.type === 'LogicalExpression' && expression.operator === '&&') {
+    return isScenario(expression.left) && ancestors.includes(expression.right as Node);
+  }
+  if (expression.type === 'ConditionalExpression') {
+    return isScenario(expression.test) && ancestors.includes(expression.consequent as Node);
+  }
+  return false;
+}
+
+/** Нарушения правила 2 в `Mockup.astro`: флажок паузы и его подпись. */
+function pauseViolations(body: unknown, frontmatter: unknown): string[] {
+  const variables = scenarioVariables(frontmatter);
+  const errors: string[] = [];
+  for (const [node, ancestors] of nodesWithAncestors(body)) {
+    if (node.type !== 'JSXElement' || !PAUSE_TAGS.has(tagName(node))) continue;
+    const tag = tagName(node);
+    const attrs = ((node.openingElement as Node).attributes as Node[]).filter((a) => a.type === 'JSXAttribute');
+    const type = attrs.find((a) => attrName(a) === 'type')?.value as Node | null | undefined;
+    if (tag === 'input' && type?.value !== 'checkbox') errors.push('<input> — только type="checkbox"');
+    const hiddenBy = (n: Node) =>
+      n.type === 'JSXElement' &&
+      ((n.openingElement as Node).attributes as Node[]).some((a) => a.type === 'JSXAttribute' && ['aria-hidden', 'inert'].includes(attrName(a)));
+    if (ancestors.some(hiddenBy)) errors.push(`<${tag}> паузы внутри обёртки aria-hidden/inert — флажок не фокусируется`);
+    if (!underScenario(ancestors, variables)) errors.push(`<${tag}> паузы вне условия по SCENARIO_KINDS`);
   }
   return errors;
 }
@@ -171,7 +309,8 @@ function kitFileViolations(file: string, source: string): string[] {
     }
     if (node.type === 'JSXElement') {
       const tag = tagName(node);
-      if (/^[a-z]/.test(tag) && !allowedTags.has(tag)) push(`тег <${tag}> — внутри кита только div и span`);
+      const pauseTag = file === FIGURE && PAUSE_TAGS.has(tag);
+      if (/^[a-z]/.test(tag) && !allowedTags.has(tag) && !pauseTag) push(`тег <${tag}> — внутри кита только div и span`);
       const attrs = ((node.openingElement as Node).attributes as Node[]).filter((a) => a.type === 'JSXAttribute');
       for (const attr of attrs) {
         const name = attrName(attr);
@@ -205,10 +344,11 @@ function kitFileViolations(file: string, source: string): string[] {
     const kinds = [...nodes(ast.body)].filter((n) => n.type === 'JSXElement' && tagName(n) === KIND_TAG);
     if (kinds.length === 0) push(`вид мокапа <${KIND_TAG}> не выводится`);
     if (kinds.some((k) => !hiddenKinds.has(k))) push(`<${KIND_TAG}> вне обёртки с aria-hidden="true" и inert`);
+    for (const message of pauseViolations(ast.body, ast.frontmatter)) push(message);
   }
 
   const css = [...source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]!).join('\n');
-  for (const message of styleViolations(css)) push(message);
+  for (const message of styleViolations(css, file)) push(message);
   return errors;
 }
 
@@ -228,7 +368,14 @@ function listAstro(root: string): string[] {
 }
 
 function checkKit(root: string): string[] {
-  return listAstro(root).flatMap((file) => kitFileViolations(file, readFileSync(join(root, file), 'utf8')));
+  const files = listAstro(root);
+  const errors = files.flatMap((file) => kitFileViolations(file, readFileSync(join(root, file), 'utf8')));
+  // Соглашение об имени файла вида: по нему гейт узнаёт вид со сценарием. Сравнение — по списку
+  // файлов, а не `existsSync`: файловая система Windows регистр не различает.
+  for (const [file, kind] of KIND_FILES) {
+    if (!files.includes(file)) errors.push(`${file}: нет файла вида «${kind}» (соглашение kinds/{PascalCase(kind)}.astro)`);
+  }
+  return errors;
 }
 
 const temps: string[] = [];
@@ -251,6 +398,27 @@ const beforeLastDiv = (markup: string) => (source: string) => {
   const at = source.lastIndexOf('</div>');
   return source.slice(0, at) + markup + source.slice(at);
 };
+
+// Флажок паузы — та же разметка, что в `Mockup.astro` (ep04 T04): пробы правила 2 строят его
+// из этих строк, и `Mockup.astro` обязан содержать `PAUSE_MARKUP` дословно (проба ниже).
+const PAUSE_SCENARIO = 'const scenario = (SCENARIO_KINDS as readonly MockupKind[]).includes(data.kind);';
+const PAUSE_FRONTMATTER = [
+  "import { SCENARIO_KINDS, type MockupKind } from '../../lib/schemas';",
+  PAUSE_SCENARIO,
+  'const motionId = `mockup-motion-${Astro.props.mockup.id}`;',
+].join('\n');
+const PAUSE_ELEMENTS =
+  '        <input type="checkbox" class="mockup__motion" id={motionId} />\n' +
+  '        <label class="mockup__pause" for={motionId}>{site.mockupPauseLabel}</label>\n';
+const PAUSE_MARKUP = `  {\n    scenario && (\n      <>\n${PAUSE_ELEMENTS}      </>\n    )\n  }\n`;
+const SCREEN_OPEN = '  <div class="mockup__screen" aria-hidden="true" inert>';
+
+/** `Mockup.astro` с флажком паузы: настоящий файл (с T04) как есть, до T04 — со вставкой. */
+function withPause(source: string): string {
+  if (source.includes(PAUSE_MARKUP)) return source;
+  const end = source.indexOf('---', 3);
+  return (source.slice(0, end) + PAUSE_FRONTMATTER + '\n' + source.slice(end)).replace(SCREEN_OPEN, PAUSE_MARKUP + SCREEN_OPEN);
+}
 
 describe('мокап-кит: строки, теги, доступность, стили', () => {
   it('в src/components/mockup нарушений нет', () => {
@@ -380,5 +548,135 @@ describe('мокап-кит: строки, теги, доступность, с�
         '@media (prefers-reduced-motion: no-preference) { @keyframes blink { to { opacity: 0; } } .x { animation: blink 1s 3; } }';
       expect(checkKit(withStyle(css))).toEqual([]);
     });
+  });
+});
+
+// ep04: вид со сценарием (`SCENARIO_KINDS`) — цикл кадров, пауза флажком, соглашение об имени
+// файла вида. Каждая отрицательная проба отличается от разрешённого случая одним условием и
+// ждёт сообщение нового правила, а не прежнего запрета.
+describe('ep04: вид со сценарием', () => {
+  const SCENARIO_FILE = 'kinds/Packflow.astro';
+  /** Разрешённый цикл: `infinite` и пауза из `--mock-play` под `no-preference`. */
+  const LOOP =
+    '@media (prefers-reduced-motion: no-preference) { @keyframes flow { to { opacity: 0; } } ' +
+    '.packflow { animation: flow 15s step-end infinite; animation-play-state: var(--mock-play, running); } }';
+  const withStyle = (file: string, css: string) =>
+    kitWith(file, (s) => (s.includes('</style>') ? s.replace('</style>', `${css}\n</style>`) : `${s}\n<style>\n${css}\n</style>\n`));
+
+  describe('правило 1: infinite — только у вида со сценарием и только под no-preference', () => {
+    it('положительная пара: цикл с паузой в kinds/Packflow.astro проходит', () => {
+      expect(checkKit(withStyle(SCENARIO_FILE, LOOP))).toEqual([]);
+    });
+
+    it('тот же цикл в kinds/Pack.astro — ошибка: вид не из SCENARIO_KINDS', () => {
+      expect(checkKit(withStyle('kinds/Pack.astro', LOOP))).toEqual([
+        'kinds/Pack.astro: бесконечная анимация (infinite) — вид «pack» не из SCENARIO_KINDS',
+      ]);
+    });
+
+    it('infinite в kinds/Packflow.astro вне no-preference — ошибка', () => {
+      expect(checkKit(withStyle(SCENARIO_FILE, '.x { animation-iteration-count: infinite; }'))).toEqual([
+        'kinds/Packflow.astro: infinite вне @media (prefers-reduced-motion: no-preference) — цикл только при движении',
+      ]);
+    });
+
+    it('граница: infinite в комментарии не считается', () => {
+      expect(checkKit(withStyle(SCENARIO_FILE, '/* .x { animation-iteration-count: infinite; } */'))).toEqual([]);
+    });
+
+    it('граница: вложенный @container внутри no-preference', () => {
+      const nested =
+        '@media (prefers-reduced-motion: no-preference) { @container (width < 30rem) { ' +
+        '.packflow { animation: flow 15s step-end infinite; animation-play-state: var(--mock-play, running); } } }';
+      expect(checkKit(withStyle(SCENARIO_FILE, nested))).toEqual([]);
+    });
+
+    it('конечная анимация в обычном виде проходит, как раньше', () => {
+      const finite = '@media (prefers-reduced-motion: no-preference) { @keyframes blink { to { opacity: 0; } } .pack { animation: blink 1s 3; } }';
+      expect(checkKit(withStyle('kinds/Pack.astro', finite))).toEqual([]);
+    });
+  });
+
+  describe('правило 3: у анимации вида со сценарием — пауза из --mock-play после animation', () => {
+    const inMotion = (rule: string) => `@media (prefers-reduced-motion: no-preference) { @keyframes flow { to { opacity: 0; } } ${rule} }`;
+    const message =
+      'kinds/Packflow.astro: правило «.packflow» с анимацией без animation-play-state: var(--mock-play, …) после animation — пауза не действует';
+
+    it('анимация без animation-play-state — ошибка', () => {
+      expect(checkKit(withStyle(SCENARIO_FILE, inMotion('.packflow { animation: flow 15s step-end infinite; }')))).toEqual([message]);
+    });
+
+    it('порядок: animation-play-state перед сокращённым animation — ошибка (сокращение сбрасывает паузу)', () => {
+      const before = '.packflow { animation-play-state: var(--mock-play, running); animation: flow 15s step-end infinite; }';
+      expect(checkKit(withStyle(SCENARIO_FILE, inMotion(before)))).toEqual([message]);
+    });
+
+    it('animation-name без паузы и пауза не из --mock-play — ошибка', () => {
+      expect(checkKit(withStyle(SCENARIO_FILE, inMotion('.packflow { animation-name: flow; }')))).toEqual([message]);
+      const paused = '.packflow { animation: flow 15s step-end infinite; animation-play-state: paused; }';
+      expect(checkKit(withStyle(SCENARIO_FILE, inMotion(paused)))).toEqual([message]);
+    });
+
+    it('граница: animation-timing-function в @keyframes не делает ключевой кадр правилом с анимацией', () => {
+      const keyframes =
+        '@media (prefers-reduced-motion: no-preference) { @keyframes flow { 0% { animation-timing-function: step-end; opacity: 1; } } }';
+      expect(checkKit(withStyle(SCENARIO_FILE, keyframes))).toEqual([]);
+    });
+  });
+
+  describe('правило 2: флажок паузы — только в Mockup.astro, вне inert и под условием по SCENARIO_KINDS', () => {
+    const unconditional = [
+      'Mockup.astro: <input> паузы вне условия по SCENARIO_KINDS',
+      'Mockup.astro: <label> паузы вне условия по SCENARIO_KINDS',
+    ];
+
+    it('положительная пара: флажок под условием и вне обёртки проходит', () => {
+      expect(checkKit(kitWith(FIGURE, withPause))).toEqual([]);
+    });
+
+    it('флажок внутри обёртки aria-hidden/inert — ошибка', () => {
+      const inside = kitWith(FIGURE, (s) =>
+        withPause(s).replace(PAUSE_MARKUP, '').replace('    <Kind mockup={data} />', `${PAUSE_MARKUP}    <Kind mockup={data} />`),
+      );
+      expect(checkKit(inside)).toEqual([
+        'Mockup.astro: <input> паузы внутри обёртки aria-hidden/inert — флажок не фокусируется',
+        'Mockup.astro: <label> паузы внутри обёртки aria-hidden/inert — флажок не фокусируется',
+      ]);
+    });
+
+    it('флажок без условия — ошибка', () => {
+      const bare = kitWith(FIGURE, (s) => withPause(s).replace(PAUSE_MARKUP, PAUSE_ELEMENTS));
+      expect(checkKit(bare)).toEqual(unconditional);
+    });
+
+    it('условие по переменной не из SCENARIO_KINDS — ошибка', () => {
+      const other = kitWith(FIGURE, (s) => withPause(s).replace(PAUSE_SCENARIO, "const scenario = data.kind === 'packflow';"));
+      expect(checkKit(other)).toEqual(unconditional);
+    });
+
+    it('ветка «иначе» тернарного выражения — ошибка', () => {
+      const otherwise = kitWith(FIGURE, (s) => withPause(s).replace('scenario && (', 'scenario ? null : ('));
+      expect(checkKit(otherwise)).toEqual(unconditional);
+    });
+
+    it('input не флажок — ошибка', () => {
+      const text = kitWith(FIGURE, (s) => withPause(s).replace('<input type="checkbox"', '<input type="text"'));
+      expect(checkKit(text)).toEqual(['Mockup.astro: <input> — только type="checkbox"']);
+    });
+
+    it('input и label в других файлах кита ловятся прежним правилом тегов', () => {
+      expect(checkKit(kitWith('ui/Panel.astro', beforeLastDiv('<input type="checkbox" />')))).toEqual([
+        'ui/Panel.astro: тег <input> — внутри кита только div и span',
+      ]);
+      expect(checkKit(kitWith(SCENARIO_FILE, beforeLastDiv('<label></label>')))).toEqual([
+        'kinds/Packflow.astro: тег <label> — внутри кита только div и span',
+      ]);
+    });
+  });
+
+  it('соглашение: у каждого вида есть kinds/{PascalCase(kind)}.astro', () => {
+    const dir = kitWith(SCENARIO_FILE, (s) => s);
+    renameSync(join(dir, SCENARIO_FILE), join(dir, 'kinds/PackFlow.astro'));
+    expect(checkKit(dir)).toEqual(['kinds/Packflow.astro: нет файла вида «packflow» (соглашение kinds/{PascalCase(kind)}.astro)']);
   });
 });
