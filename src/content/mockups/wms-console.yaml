@@ -1,26 +1,27 @@
-# Нейтральные демо-значения до утверждения пакета ep03 (T19): в код — только утверждённое.
+# Тексты утверждены владельцем 2026-09-27: docs/ep03-product-wms/log.md → «Утверждение текстов: wms»
+# (пакет texts/wms.md, коммит d0f9394). Правка — новым циклом runbook, не напрямую.
 kind: console
-caption: "Заглушка ep03: подпись фигуры веб-консоли, близкая по длине к итоговой подписи экрана."
-app: "Консоль"
-screen: "Экран 1"
-panels: { zones: "Панель 1", waves: "Панель 2", exceptions: "Панель 3" }
-nav: ["Раздел 1", "Раздел 2", "Раздел 3", "Раздел 4", "Раздел 5", "Раздел 6", "Раздел 7"]
+caption: "Монитор склада в веб-консоли Belka WMS — системы управления складом: показатели смены, загрузка зон, активные волны и исключения."
+app: "Belka WMS"
+screen: "Монитор склада"
+panels: { zones: "Загрузка зон", waves: "Активные волны", exceptions: "Исключения" }
+nav: ["Монитор склада", "Приёмка", "Размещение", "Заказы", "Отбор и волны", "Инвентаризация", "Справочники"]
 kpis:
-  - { label: "Показатель 1", value: 146 }
-  - { label: "Показатель 2", value: 1284 }
-  - { label: "Показатель 3", value: 12 }
-  - { label: "Показатель 4", value: 37 }
+  - { label: "Заказов в работе", value: 146 }
+  - { label: "Строк к отбору", value: 1284 }
+  - { label: "Паллет в буфере", value: 12 }
+  - { label: "Заданий в очереди", value: 37 }
 zones:
-  - { label: "Зона 1", load: 82 }
-  - { label: "Зона 2", load: 64 }
-  - { label: "Зона 3", load: 47 }
-  - { label: "Зона 4", load: 91 }
+  - { label: "Зона A · стеллажи", load: 82 }
+  - { label: "Зона B · мезонин", load: 64 }
+  - { label: "Зона C · напольное", load: 47 }
+  - { label: "Буфер приёмки", load: 91 }
 waves:
-  - { code: "W-0001", status: { label: "Статус 1", tone: ok }, progress: 92 }
-  - { code: "W-0002", status: { label: "Статус 2", tone: ok }, progress: 64 }
-  - { code: "W-0003", status: { label: "Статус 3", tone: warn }, progress: 38 }
-  - { code: "W-0004", status: { label: "Статус 4", tone: neutral }, progress: 0 }
+  - { code: "W-1206", status: { label: "Упаковка", tone: ok }, progress: 92 }
+  - { code: "W-1207", status: { label: "Отбор", tone: ok }, progress: 64 }
+  - { code: "W-1208", status: { label: "Нехватка", tone: warn }, progress: 38 }
+  - { code: "W-1209", status: { label: "Ожидает", tone: neutral }, progress: 0 }
 exceptions:
-  - { text: "Исключение 1", tone: risk }
-  - { text: "Исключение 2", tone: warn }
-  - { text: "Исключение 3", tone: warn }
+  - { text: "Ячейка A-04-12-3: недостача", tone: risk }
+  - { text: "Волна W-1208: нехватка", tone: warn }
+  - { text: "Ворота 3: простой", tone: warn }
