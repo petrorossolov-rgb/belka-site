@@ -4,6 +4,8 @@ import {
   BLOCK_VIEWS,
   LIMITS,
   MOCKUP_KIND_NAMES,
+  PACKFLOW_FRAMES,
+  SCENARIO_KINDS,
   blockSchema,
   caseSchema,
   mockupSchema,
@@ -52,6 +54,10 @@ describe('LIMITS и BLOCK_VIEWS', () => {
 
   it('лимиты ep03 — как в плане ep03', () => {
     expect(LIMITS).toMatchObject({ descriptorMax: 60, captionMax: 160, mockLabelMax: 28, mockCodeMax: 16, mockupNoteMax: 60 });
+  });
+
+  it('лимиты ep04 — как в плане ep04', () => {
+    expect(LIMITS).toMatchObject({ mockMarkMax: 40, mockupPauseMax: 40, mockCodeMax: 16 });
   });
 
   it('виды секций', () => {
@@ -433,14 +439,27 @@ describe('site', () => {
     expectLimit(site, (mockupNote) => ({ ...validSite, mockupNote }), LIMITS.mockupNoteMax, 'mockupNote');
     expect(issuePaths(site, { ...validSite, mockupNote: '' })).toEqual(['mockupNote']);
   });
+
+  it('mockupPauseLabel необязателен и ограничен лимитом mockupPauseMax', () => {
+    expect(site.parse(validSite).mockupPauseLabel).toBeUndefined();
+    expectLimit(site, (mockupPauseLabel) => ({ ...validSite, mockupPauseLabel }), LIMITS.mockupPauseMax, 'mockupPauseLabel');
+    expect(issuePaths(site, { ...validSite, mockupPauseLabel: '' })).toEqual(['mockupPauseLabel']);
+  });
 });
 
 describe('mockup', () => {
-  const { console: consoleMockup, terminal, pack, dashboard } = validMockups;
+  const { console: consoleMockup, terminal, pack, dashboard, packflow } = validMockups;
 
   it('фикстура есть у каждого вида', () => {
     expect(Object.keys(validMockups)).toEqual([...MOCKUP_KIND_NAMES]);
-    expect(MOCKUP_KIND_NAMES).toEqual(['console', 'terminal', 'pack', 'dashboard']);
+    expect(MOCKUP_KIND_NAMES).toEqual(['console', 'terminal', 'pack', 'dashboard', 'packflow']);
+  });
+
+  it('виды со сценарием — подмножество видов; кадров packflow шесть (ep04)', () => {
+    expect(SCENARIO_KINDS).toEqual(['packflow']);
+    for (const kind of SCENARIO_KINDS) expect(MOCKUP_KIND_NAMES).toContain(kind);
+    expect(PACKFLOW_FRAMES).toBe(6);
+    expect(packflow.frames).toHaveLength(PACKFLOW_FRAMES);
   });
 
   it.each(MOCKUP_KIND_NAMES)('принимает мокап kind: %s', (kind) => {
@@ -544,5 +563,96 @@ describe('mockup', () => {
     ['scan.last', LIMITS.mockCodeMax, (v: string) => ({ ...pack, scan: { ...pack.scan, last: v } })],
   ] as const)('ограничивает %s лимитом (%i символов)', (path, max, build) => {
     expectLimit(mockupSchema, build, max, path);
+  });
+});
+
+describe('mockup kind: packflow (ep04)', () => {
+  const { packflow } = validMockups;
+  type Frame = (typeof packflow.frames)[number];
+  const frames = packflow.frames as readonly Frame[];
+  /** Мокап с заменой кадра `i`. */
+  const withFrame = (i: number, frame: object) => ({ ...packflow, frames: frames.map((f, j) => (j === i ? frame : f)) });
+
+  it('каждое необязательное поле кадра есть хотя бы в одном кадре фикстуры', () => {
+    const fields = ['order', 'box', 'progress', 'item', 'mark', 'label', 'status', 'action'];
+    for (const field of fields) expect(frames.some((f) => field in f), field).toBe(true);
+    expect(frames.some((f) => 'value' in f.scan)).toBe(true);
+  });
+
+  it('принимает мокап без operator', () => {
+    const { operator: _, ...withoutOperator } = packflow;
+    expect(mockupSchema.safeParse(withoutOperator).success).toBe(true);
+  });
+
+  it('ровно PACKFLOW_FRAMES кадров: пять и семь — ошибка по пути frames', () => {
+    expect(issuePaths(mockupSchema, { ...packflow, frames: frames.slice(0, 5) })).toEqual(['frames']);
+    expect(issuePaths(mockupSchema, { ...packflow, frames: [...frames, frames[0]] })).toEqual(['frames']);
+  });
+
+  it('staticFrame — целое 1…PACKFLOW_FRAMES', () => {
+    expect(mockupSchema.safeParse({ ...packflow, staticFrame: 1 }).success).toBe(true);
+    expect(mockupSchema.safeParse({ ...packflow, staticFrame: PACKFLOW_FRAMES }).success).toBe(true);
+    expect(issuePaths(mockupSchema, { ...packflow, staticFrame: 0 })).toEqual(['staticFrame']);
+    expect(issuePaths(mockupSchema, { ...packflow, staticFrame: PACKFLOW_FRAMES + 1 })).toEqual(['staticFrame']);
+    expect(issuePaths(mockupSchema, { ...packflow, staticFrame: 2.5 })).toEqual(['staticFrame']);
+  });
+
+  it('steps — 4…6 подписей', () => {
+    const firstStep = frames.map((f) => ({ ...f, step: 1 }));
+    expect(issuePaths(mockupSchema, { ...packflow, steps: packflow.steps.slice(0, 3), frames: firstStep })).toEqual(['steps']);
+    expect(issuePaths(mockupSchema, { ...packflow, steps: [...packflow.steps, 'Шаг 6', 'Шаг 7'] })).toEqual(['steps']);
+  });
+
+  it('refine через союз: шаг кадра — номер шага рельса', () => {
+    const last = packflow.steps.length;
+    expect(mockupSchema.safeParse(withFrame(0, { ...frames[0], step: last })).success).toBe(true);
+    expect(issuePaths(mockupSchema, withFrame(0, { ...frames[0], step: last + 1 }))).toEqual(['frames.0.step']);
+    expect(issuePaths(mockupSchema, withFrame(0, { ...frames[0], step: 0 }))).toEqual(['frames.0.step']);
+  });
+
+  it('refine через союз: progress.done не больше total', () => {
+    expect(mockupSchema.safeParse(withFrame(1, { ...frames[1], progress: { done: 5, total: 5 } })).success).toBe(true);
+    expect(issuePaths(mockupSchema, withFrame(1, { ...frames[1], progress: { done: 6, total: 5 } }))).toEqual([
+      'frames.1.progress.done',
+    ]);
+  });
+
+  it('кадр — строгий объект: опечатка marks — ошибка', () => {
+    const { mark, ...rest } = packflow.frames[2];
+    const result = mockupSchema.safeParse(withFrame(2, { ...rest, marks: mark }));
+    expect(result.success).toBe(false);
+    expect(result.error!.issues).toMatchObject([{ code: 'unrecognized_keys', keys: ['marks'], path: ['frames', 2] }]);
+  });
+
+  it('log и prompt обязательны в каждом кадре', () => {
+    const { log: _l, ...withoutLog } = frames[0]!;
+    expect(issuePaths(mockupSchema, withFrame(0, withoutLog))).toEqual(['frames.0.log']);
+    const { prompt: _p, ...withoutPrompt } = frames[0]!;
+    expect(issuePaths(mockupSchema, withFrame(0, withoutPrompt))).toEqual(['frames.0.prompt']);
+  });
+
+  it.each([
+    ['frames.2.mark', LIMITS.mockMarkMax, (v: string) => withFrame(2, { ...frames[2], mark: v })],
+    ['frames.0.prompt', LIMITS.mockLabelMax, (v: string) => withFrame(0, { ...frames[0], prompt: v })],
+    ['frames.0.log.text', LIMITS.mockLabelMax, (v: string) => withFrame(0, { ...frames[0], log: { time: '10:00:00', text: v } })],
+    ['frames.0.log.time', LIMITS.mockCodeMax, (v: string) => withFrame(0, { ...frames[0], log: { time: v, text: 'Строка' } })],
+    ['frames.3.label.expected', LIMITS.mockCodeMax, (v: string) => withFrame(3, { ...frames[3], label: { template: 'Шаблон', expected: v } })],
+    ['frames.1.scan.value', LIMITS.mockCodeMax, (v: string) => withFrame(1, { ...frames[1], scan: { label: 'Скан', value: v } })],
+    ['station.code', LIMITS.mockCodeMax, (v: string) => ({ ...packflow, station: { label: 'Стол', code: v } })],
+    ['panels.log', LIMITS.mockLabelMax, (v: string) => ({ ...packflow, panels: { log: v } })],
+    ['steps.0', LIMITS.mockLabelMax, (v: string) => ({ ...packflow, steps: [v, ...packflow.steps.slice(1)] })],
+  ] as const)('ограничивает %s лимитом (%i символов)', (path, max, build) => {
+    expectLimit(mockupSchema, build, max, path);
+  });
+
+  it('refine не падает на битых кадрах: ошибка типа, а не исключение', () => {
+    // Zod 4 добавляет к ошибке типа и ошибку длины (`.length` мерит и строку) — обе по пути frames.
+    expect(new Set(issuePaths(mockupSchema, { ...packflow, frames: 'кадры' }))).toEqual(new Set(['frames']));
+    expect(issuePaths(mockupSchema, withFrame(1, { ...frames[1], progress: { done: 1 } }))).toEqual(['frames.1.progress.total']);
+    expect(issuePaths(mockupSchema, { ...packflow, steps: 'шаги' })).toEqual(['steps']);
+  });
+
+  it('пустой mark — ошибка', () => {
+    expect(issuePaths(mockupSchema, withFrame(2, { ...frames[2], mark: '' }))).toEqual(['frames.2.mark']);
   });
 });
