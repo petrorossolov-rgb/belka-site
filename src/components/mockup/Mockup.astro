@@ -4,24 +4,43 @@
 // структурно, Constitution 1). Внутренность — `aria-hidden="true"` и `inert`: скринридер читает
 // только подпись, сотни ячеек не фокусируются. Корень — query-контейнер: вид перестраивается по
 // ширине фигуры, а не окна; кегль `--mock-font` (cqi) стоит на потомке корня. Строк нет.
+//
+// Вид со сценарием (ep04, `SCENARIO_KINDS`): перед внутренностью — флажок паузы и его подпись
+// `site.mockupPauseLabel`, единственный фокусируемый элемент кита. Отмеченный флажок ставит
+// `--mock-play: paused` на внутренность, анимации вида берут из неё `animation-play-state`.
+// Подпись не оборачивает флажок (иначе `~` не достанет до экрана): связь — `for`/`id` из id
+// записи (мокап на странице не повторяется, правило целостности 4). Без движения флажка нет.
 import { MOCKUP_KINDS } from './kinds';
 import { getSite, type Mockup } from '../../lib/content';
+import { SCENARIO_KINDS, type MockupKind } from '../../lib/schemas';
 
 interface Props {
   mockup: Mockup;
 }
 
-const { data } = Astro.props.mockup;
+const { id, data } = Astro.props.mockup;
 const site = await getSite();
 // Сужение объединения видов до компонента своего вида TypeScript через индекс не выводит:
 // карта типизирована по видам (`MOCKUP_KINDS`), здесь вид и данные берутся из одной записи.
 const Kind = MOCKUP_KINDS[data.kind] as (props: { mockup: Mockup['data'] }) => unknown;
 // Подпись о демо-данных обязательна (правило целостности 5); без неё фигура не выводится молча.
-if (site.mockupNote === undefined) throw new Error(`мокап «${Astro.props.mockup.id}»: в site.yaml нет mockupNote`);
+if (site.mockupNote === undefined) throw new Error(`мокап «${id}»: в site.yaml нет mockupNote`);
 const caption = `${data.caption} ${site.mockupNote}`;
+const scenario = (SCENARIO_KINDS as readonly MockupKind[]).includes(data.kind);
+const motionId = `mockup-motion-${id}`;
+// Подпись паузы обязательна у вида со сценарием (правило целостности 9).
+if (scenario && site.mockupPauseLabel === undefined) throw new Error(`мокап «${id}»: в site.yaml нет mockupPauseLabel`);
 ---
 
 <figure class="mockup">
+  {
+    scenario && (
+      <>
+        <input type="checkbox" class="mockup__motion" id={motionId} />
+        <label class="mockup__pause" for={motionId}>{site.mockupPauseLabel}</label>
+      </>
+    )
+  }
   <div class="mockup__screen" aria-hidden="true" inert>
     <Kind mockup={data} />
   </div>
@@ -50,5 +69,55 @@ const caption = `${data.caption} ${site.mockupNote}`;
   .mockup__caption {
     color: var(--color-text-muted);
     font-size: var(--text-small);
+  }
+
+  /* Пауза сценария: отмеченный флажок останавливает анимации вида (WCAG 2.2.2, без JS). */
+  .mockup__motion:checked ~ .mockup__screen {
+    --mock-play: paused;
+  }
+
+  /* Без движения ставить на паузу нечего: флажок и подпись показываются только при движении. */
+  .mockup__motion,
+  .mockup__pause {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* В DOM флажок перед экраном (для `~`), на экране — под ним, рядом с подписью фигуры. */
+    .mockup:has(> .mockup__motion) {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas:
+        'screen screen screen'
+        'caption motion pause';
+      align-items: start;
+    }
+
+    .mockup:has(> .mockup__motion) > .mockup__screen {
+      grid-area: screen;
+    }
+
+    .mockup:has(> .mockup__motion) > .mockup__caption {
+      grid-area: caption;
+    }
+
+    .mockup__motion {
+      display: block;
+      grid-area: motion;
+      inline-size: var(--control-target);
+      block-size: var(--control-target);
+      margin: 0;
+      accent-color: var(--color-accent);
+      cursor: pointer;
+    }
+
+    .mockup__pause {
+      display: block;
+      grid-area: pause;
+      min-block-size: var(--control-target);
+      color: var(--color-text-muted);
+      font-size: var(--text-small);
+      line-height: var(--control-target);
+      cursor: pointer;
+    }
   }
 </style>

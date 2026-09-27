@@ -630,6 +630,12 @@ describe('ep04: вид со сценарием', () => {
       'Mockup.astro: <label> паузы вне условия по SCENARIO_KINDS',
     ];
 
+    it('Mockup.astro выводит флажок той же разметкой, что строят пробы (T04)', () => {
+      const source = readFileSync(join(KIT, FIGURE), 'utf8');
+      expect(source).toContain(PAUSE_MARKUP);
+      expect(source).toContain(PAUSE_SCENARIO);
+    });
+
     it('положительная пара: флажок под условием и вне обёртки проходит', () => {
       expect(checkKit(kitWith(FIGURE, withPause))).toEqual([]);
     });

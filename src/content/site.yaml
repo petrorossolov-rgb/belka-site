@@ -18,3 +18,6 @@ site:
     defaultOgImageAlt: "Знак Belka SCM и слоган «Знает, где что лежит.»"
   # Подпись о демо-данных у каждой фигуры мокапа (ep03), утверждена 2026-09-27 (texts/wms.md).
   mockupNote: "Демо-данные."
+  # Подпись флажка паузы у фигуры вида со сценарием (ep04) — заглушка до утверждения пакета
+  # docs/ep04-product-packapp/texts/packapp.md (T13).
+  mockupPauseLabel: "Заглушка ep04: Пауза"

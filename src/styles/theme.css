@@ -106,6 +106,7 @@
   --border-width: 1px;
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+  --control-target: 1.5rem;                                     /* 24 × 24: минимальная цель нажатия контрола (WCAG 2.5.8) — флажок паузы мокапа */
   --link-underline-offset: 0.15em;
 
   /* Знак: пропорции lockup из guidelines/brand-logo.html (знак 64, словесный знак 30, зазор 14) */
@@ -193,6 +194,7 @@
   --mock-bar-radius: 0.125em;                                   /* верх столбца */
   --mock-tile-min: 9em;                                         /* плитка загрузки в авто-сетке */
   --mock-mark-w: 0.25em;                                        /* цветная метка тона слева от строки */
+  --mock-flow-frame: 2.5s;                                      /* кадр сценария packflow (ep04): цикл = PACKFLOW_FRAMES × кадр */
 
   /* Движение */
   --motion-duration-fast: var(--dur-fast);

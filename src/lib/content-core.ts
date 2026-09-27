@@ -2,7 +2,7 @@
 // Без импорта `astro:*` — работает на любых объектах вида `{ id, data, body? }`,
 // поэтому тесты не поднимают Astro. Доступ к коллекциям — только `src/lib/content.ts`.
 
-import { LIMITS, type BlockView, type MockupKind } from './schemas';
+import { LIMITS, SCENARIO_KINDS, type BlockView, type MockupKind } from './schemas';
 import { productTitle } from './seo';
 import type { SiteEnv } from './site-env';
 
@@ -267,6 +267,7 @@ function source(entry: EntryLike<unknown>): string {
 /** Поля `site`, которые читает проверка целостности. */
 export interface IntegritySiteLike extends FooterSiteLike {
   mockupNote?: string | undefined;
+  mockupPauseLabel?: string | undefined;
   seo?: { defaultOgImage?: ImageMetaLike | undefined } | undefined;
 }
 
@@ -423,6 +424,19 @@ export function assertContentIntegrity({
   // в том числе черновой, — стейджинг его рендерит.
   if (shownMockups.size > 0 && (site.mockupNote ?? '').trim() === '') {
     errors.push(`src/content/site.yaml: на сайте есть мокапы (${[...shownMockups].join(', ')}), но не задан mockupNote`);
+  }
+
+  // Подпись флажка паузы у фигуры вида со сценарием (ep04, Constitution 6): мокап вида из
+  // `SCENARIO_KINDS` в секциях любой записи, в том числе черновой, — стейджинг его рендерит.
+  const mockupKinds = new Map(mockups.map((m) => [m.id, m.data.kind]));
+  const scenarioMockups = [...shownMockups].filter((id) => {
+    const kind = mockupKinds.get(id);
+    return kind !== undefined && (SCENARIO_KINDS as readonly MockupKind[]).includes(kind);
+  });
+  if (scenarioMockups.length > 0 && (site.mockupPauseLabel ?? '').trim() === '') {
+    errors.push(
+      `src/content/site.yaml: на сайте есть мокапы со сценарием (${scenarioMockups.join(', ')}), но не задан mockupPauseLabel`,
+    );
   }
 
   // OG-карточка — PNG 1200×630: так её рисует build:og и принимает check-dist-seo.
