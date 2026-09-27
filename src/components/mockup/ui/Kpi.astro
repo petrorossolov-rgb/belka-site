@@ -1,7 +1,7 @@
 ---
 // Примитив кита: показатель — подпись, значение крупно (число через `mock-format`), единица
 // из данных и необязательный слот под значением (спарклайн). Строк нет.
-import { withUnit, type NumberForm } from '../../../lib/mock-format';
+import { NUMBER_FORMS, withUnit, type NumberForm } from '../../../lib/mock-format';
 
 interface Props {
   label: string;
@@ -11,7 +11,7 @@ interface Props {
   dark?: boolean;
 }
 
-const { label, value, unit, form = 'count', dark = false } = Astro.props;
+const { label, value, unit, form = NUMBER_FORMS.count, dark = false } = Astro.props;
 ---
 
 <div class:list={['kpi', { 'kpi--dark': dark }]}>

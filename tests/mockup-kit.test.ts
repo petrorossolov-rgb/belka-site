@@ -21,8 +21,13 @@ const FIGURE = 'Mockup.astro';
 /** Теги HTML внутри кита; `figure`/`figcaption` — только в `Mockup.astro`. */
 const KIT_TAGS = new Set(['div', 'span', 'slot', 'style']);
 const FIGURE_TAGS = new Set(['figure', 'figcaption']);
-/** Атрибуты, значение которых читает человек или скринридер. */
-const TEXT_ATTRS = new Set(['aria-label', 'aria-description', 'title', 'alt', 'placeholder']);
+/**
+ * Атрибуты, значение которых читает человек или скринридер, и директивы Astro, которые выводят
+ * строку как содержимое элемента (`set:html`, `set:text`).
+ */
+const TEXT_ATTRS = new Set(['aria-label', 'aria-description', 'title', 'alt', 'placeholder', 'set:html', 'set:text']);
+/** Компонент вида в `Mockup.astro`: он обязан стоять внутри скрытой от AT и неактивной обёртки. */
+const KIND_TAG = 'Kind';
 const LETTER = /\p{L}/u;
 
 type Node = { type: string; [key: string]: unknown };
@@ -59,7 +64,14 @@ function outputStrings(expression: unknown, constants: Map<string, string>): str
     switch (value.type) {
       case 'JSXElement':
       case 'JSXFragment':
+        return;
       case 'BinaryExpression':
+        // Сравнение (`kind === 'x'`) строку не выводит; конкатенация (`'От' + 'бор'`) — выводит
+        // (ep03 T21, Codex F01): её части проверяются как выводимые.
+        if (value.operator === '+') {
+          visit(value.left);
+          visit(value.right);
+        }
         return;
       case 'Literal':
         if (typeof value.value === 'string' && LETTER.test(value.value)) found.push(value.value);
@@ -86,15 +98,21 @@ function outputStrings(expression: unknown, constants: Map<string, string>): str
   return found;
 }
 
-/** Константы frontmatter, чьё значение — строка с буквами (`const title = 'Pick'`). */
+/**
+ * Константы frontmatter, чьё значение — строка с буквами: `const title = 'Pick'` и значение по
+ * умолчанию в деструктуризации `const { meta = 'Смена' } = Astro.props` (T21).
+ */
 function stringConstants(frontmatter: unknown): Map<string, string> {
   const constants = new Map<string, string>();
   for (const node of nodes(frontmatter)) {
-    if (node.type !== 'VariableDeclarator') continue;
-    const id = node.id as Node;
-    if (id.type !== 'Identifier') continue;
-    const strings = outputStrings(node.init, new Map());
-    if (strings.length > 0) constants.set(String(id.name), strings.join(' '));
+    if (node.type === 'VariableDeclarator' && (node.id as Node).type === 'Identifier') {
+      const strings = outputStrings(node.init, new Map());
+      if (strings.length > 0) constants.set(String((node.id as Node).name), strings.join(' '));
+    }
+    if (node.type === 'AssignmentPattern' && (node.left as Node).type === 'Identifier') {
+      const strings = outputStrings(node.right, new Map());
+      if (strings.length > 0) constants.set(String((node.left as Node).name), strings.join(' '));
+    }
   }
   return constants;
 }
@@ -119,7 +137,7 @@ function styleViolations(css: string): string[] {
   const errors: string[] = [];
   if (/text-overflow\s*:/.test(code)) errors.push('text-overflow — многоточие прячет данные');
   for (const match of code.matchAll(/overflow(?:-x|-y|-inline|-block)?\s*:\s*([^;}]+)/g)) {
-    if (/\b(hidden|auto|scroll)\b/.test(match[1]!)) errors.push(`overflow: ${match[1]!.trim()} — данные не прячутся и не прокручиваются`);
+    if (/\b(hidden|auto|scroll|clip)\b/.test(match[1]!)) errors.push(`overflow: ${match[1]!.trim()} — данные не прячутся и не прокручиваются`);
   }
   if (/\binfinite\b/.test(code)) errors.push('бесконечная анимация (infinite)');
   if (/@keyframes|animation(?:-name)?\s*:/.test(withoutMotionQueries(code))) {
@@ -138,10 +156,18 @@ function kitFileViolations(file: string, source: string): string[] {
   const allowedTags = file === FIGURE ? new Set([...KIT_TAGS, ...FIGURE_TAGS]) : KIT_TAGS;
   const push = (message: string) => errors.push(`${file}: ${message}`);
   let hidden = 0;
+  const hiddenKinds = new Set<Node>();
 
   for (const node of nodes(ast.body)) {
     if (node.type === 'JSXText' && (node.value as string).trim() !== '') {
       if (!isStyleText(node, ast.body)) push(`литеральный текст «${(node.value as string).trim()}»`);
+    }
+    if (node.type === 'JSXFragment') {
+      for (const child of node.children as Node[]) {
+        if (child.type === 'JSXExpressionContainer') {
+          for (const text of outputStrings(child.expression, constants)) push(`выражение выводит строку «${text}»`);
+        }
+      }
     }
     if (node.type === 'JSXElement') {
       const tag = tagName(node);
@@ -157,7 +183,10 @@ function kitFileViolations(file: string, source: string): string[] {
       const ariaHidden = attrs.find((a) => attrName(a) === 'aria-hidden');
       if (ariaHidden && (ariaHidden.value as Node | null)?.value === 'true') {
         hidden++;
-        if (!attrs.some((a) => attrName(a) === 'inert')) push('aria-hidden="true" без inert — внутренность фокусируется');
+        const inert = attrs.find((a) => attrName(a) === 'inert');
+        // `inert` — только голым атрибутом: `inert={false}` или `inert={cond}` его снимают.
+        if (!inert || inert.value !== null) push('aria-hidden="true" без inert — внутренность фокусируется');
+        else for (const inner of nodes(node.children)) if (inner.type === 'JSXElement' && tagName(inner) === KIND_TAG) hiddenKinds.add(inner);
       }
       for (const child of node.children as Node[]) {
         if (child.type === 'JSXExpressionContainer') {
@@ -172,6 +201,11 @@ function kitFileViolations(file: string, source: string): string[] {
     }
   }
   if (file === FIGURE && hidden === 0) push('внутренность фигуры без aria-hidden="true" и inert');
+  if (file === FIGURE) {
+    const kinds = [...nodes(ast.body)].filter((n) => n.type === 'JSXElement' && tagName(n) === KIND_TAG);
+    if (kinds.length === 0) push(`вид мокапа <${KIND_TAG}> не выводится`);
+    if (kinds.some((k) => !hiddenKinds.has(k))) push(`<${KIND_TAG}> вне обёртки с aria-hidden="true" и inert`);
+  }
 
   const css = [...source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]!).join('\n');
   for (const message of styleViolations(css)) push(message);
@@ -250,6 +284,20 @@ describe('мокап-кит: строки, теги, доступность, с�
       expect(checkKit(dir)).toEqual(['ui/AppBar.astro: выражение выводит строку «Pick»']);
     });
 
+    it('конкатенация строк в выражении и в константе frontmatter ловится (T21, Codex F01)', () => {
+      const inline = kitWith('ui/AppBar.astro', (s) => s.replace('{title}</div>', "{'От' + 'бор'}</div>"));
+      expect(checkKit(inline)).toEqual(['ui/AppBar.astro: выражение выводит строку «От»', 'ui/AppBar.astro: выражение выводит строку «бор»']);
+      const constant = kitWith('ui/AppBar.astro', (s) =>
+        s.replace('const { title, meta } = Astro.props;', "const { meta } = Astro.props;\nconst title = 'От' + 'бор';"),
+      );
+      expect(checkKit(constant)).toEqual(['ui/AppBar.astro: выражение выводит строку «От бор»']);
+    });
+
+    it('сравнение со строкой в выражении не считается выводом', () => {
+      const dir = kitWith('ui/AppBar.astro', (s) => s.replace('{title}</div>', "{title === 'x' ? meta : title}</div>"));
+      expect(checkKit(dir)).toEqual([]);
+    });
+
     it('строка-литерал прямо в выражении и в шаблонной строке ловится', () => {
       const dir = kitWith('ui/AppBar.astro', (s) => s.replace('{title}</div>', "{title ?? 'Отбор'}</div>"));
       expect(checkKit(dir)).toEqual(['ui/AppBar.astro: выражение выводит строку «Отбор»']);
@@ -272,9 +320,40 @@ describe('мокап-кит: строки, теги, доступность, с�
 
   it('проба: внутренность фигуры без inert ловится', () => {
     const dir = kitWith(FIGURE, (s) => s.replace(' aria-hidden="true" inert>', ' aria-hidden="true">'));
-    expect(checkKit(dir)).toEqual(['Mockup.astro: aria-hidden="true" без inert — внутренность фокусируется']);
+    expect(checkKit(dir)).toEqual([
+      'Mockup.astro: aria-hidden="true" без inert — внутренность фокусируется',
+      'Mockup.astro: <Kind> вне обёртки с aria-hidden="true" и inert',
+    ]);
     const none = kitWith(FIGURE, (s) => s.replace(' aria-hidden="true" inert>', '>'));
-    expect(checkKit(none)).toEqual(['Mockup.astro: внутренность фигуры без aria-hidden="true" и inert']);
+    expect(checkKit(none)).toEqual([
+      'Mockup.astro: внутренность фигуры без aria-hidden="true" и inert',
+      'Mockup.astro: <Kind> вне обёртки с aria-hidden="true" и inert',
+    ]);
+  });
+
+  it('проба: inert={false} не считается inert, <Kind> вне скрытой обёртки ловится (T21)', () => {
+    const off = kitWith(FIGURE, (s) => s.replace(' aria-hidden="true" inert>', ' aria-hidden="true" inert={false}>'));
+    expect(checkKit(off)).toEqual([
+      'Mockup.astro: aria-hidden="true" без inert — внутренность фокусируется',
+      'Mockup.astro: <Kind> вне обёртки с aria-hidden="true" и inert',
+    ]);
+    const outside = kitWith(FIGURE, (s) =>
+      s.replace('    <Kind mockup={data} />\n  </div>', '  </div>\n  <Kind mockup={data} />'),
+    );
+    expect(checkKit(outside)).toEqual(['Mockup.astro: <Kind> вне обёртки с aria-hidden="true" и inert']);
+  });
+
+  it('проба: значение по умолчанию в деструктуризации, set:html/set:text и выражение во фрагменте (T21)', () => {
+    const fallback = kitWith('ui/AppBar.astro', (s) =>
+      s.replace('const { title, meta } = Astro.props;', "const { title = 'Смена', meta } = Astro.props;"),
+    );
+    expect(checkKit(fallback)).toEqual(['ui/AppBar.astro: выражение выводит строку «Смена»']);
+    const html = kitWith('ui/Panel.astro', beforeLastDiv('<div set:html="Отбор" />'));
+    expect(checkKit(html)).toEqual(['ui/Panel.astro: set:html="Отбор" — строка из данных, не из шаблона']);
+    const text = kitWith('ui/Panel.astro', beforeLastDiv("<div set:text={'Отбор'} />"));
+    expect(checkKit(text)).toEqual(['ui/Panel.astro: set:text выводит строку «Отбор»']);
+    const fragment = kitWith('ui/Panel.astro', beforeLastDiv("{title && <>{'Отбор'}</>}"));
+    expect(checkKit(fragment)).toEqual(['ui/Panel.astro: выражение выводит строку «Отбор»']);
   });
 
   describe('проба: стили', () => {
@@ -285,6 +364,7 @@ describe('мокап-кит: строки, теги, доступность, с�
       ['.x { overflow: hidden; }', 'ui/Panel.astro: overflow: hidden — данные не прячутся и не прокручиваются'],
       ['.x { overflow-x: auto; }', 'ui/Panel.astro: overflow: auto — данные не прячутся и не прокручиваются'],
       ['.x { overflow: clip scroll; }', 'ui/Panel.astro: overflow: clip scroll — данные не прячутся и не прокручиваются'],
+      ['.x { overflow-y: clip; }', 'ui/Panel.astro: overflow: clip — данные не прячутся и не прокручиваются'],
       ['@keyframes blink { to { opacity: 0; } }', 'ui/Panel.astro: анимация вне @media (prefers-reduced-motion: no-preference)'],
       ['.x { animation: blink 1s; }', 'ui/Panel.astro: анимация вне @media (prefers-reduced-motion: no-preference)'],
       [

@@ -61,3 +61,8 @@ export function withUnit(n: number, unit?: string, form: NumberForm = 'count'): 
   const value = form === 'decimal' ? decimal(n) : groupDigits(n);
   return unit === undefined || unit === '' ? value : `${value}${NBSP}${unit}`;
 }
+
+/** Сделано из всего: ofTotal(3, 8) → «3 / 8», числа — с разрядами (ep03 T21). */
+export function ofTotal(done: number, total: number): string {
+  return `${groupDigits(done)} / ${groupDigits(total)}`;
+}
