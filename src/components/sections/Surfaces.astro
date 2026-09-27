@@ -1,38 +1,107 @@
 ---
-// Вид `surfaces`: скелет до T11 — только заголовок и текст пункта, без фигуры мокапа и без
-// имени продукта. Нужен, чтобы карта `VIEWS: Record<BlockView, …>` собиралась; блоков
-// `surfaces` в контенте до T11 нет, поэтому скелет нигде не рендерится.
-import type { Block } from '../../lib/content';
+// Вид `surfaces`: рабочие места продуктов с мокапами. Пункт — имя продукта с русским пояснением
+// (Constitution 3; ссылка на страницу продукта — только собранная и не текущая, `surfaceLink`),
+// заголовок `h3`, текст и фигура `Mockup`. От 64rem текст и фигура стоят рядом и чередуются по
+// сторонам, уже — стопкой. Строк нет: всё из блока, продукта и мокапа.
+import Mockup from '../mockup/Mockup.astro';
+import ProductName from '../ProductName.astro';
+import { surfaceLink } from '../../lib/content-core';
+import { getMockup, getProductPages, getVisible, type Block } from '../../lib/content';
+import { TITLE_SEPARATOR } from '../../lib/seo';
 
 interface Props {
   block: Block;
 }
 
-const { items } = Astro.props.block.data;
+const { block } = Astro.props;
+const products = await getVisible('products');
+const pages = await getProductPages();
+const entries = await Promise.all(
+  block.data.items.map(async (item) => {
+    // Ссылки пункта обязательны у `surfaces` (схема), продукт и мокап существуют (целостность).
+    const product = products.find((p) => p.id === item.product?.id);
+    if (product === undefined || item.mockup === undefined) {
+      throw new Error(`${block.filePath ?? block.id}: пункт «${item.title}» без видимого продукта или мокапа`);
+    }
+    return {
+      item,
+      product,
+      mockup: await getMockup(item.mockup),
+      href: surfaceLink(product, pages, Astro.url.pathname),
+    };
+  }),
+);
 ---
 
-<ul class="surfaces" role="list">
+<ol class="surfaces" role="list">
   {
-    items.map((item) => (
+    entries.map(({ item, product, mockup, href }) => (
       <li class="surfaces__item">
-        <h3>{item.title}</h3>
-        {item.text && <p>{item.text}</p>}
+        <div class="surfaces__text">
+          <p class="surfaces__product">
+            {href ? (
+              <a href={href}>
+                <ProductName name={product.data.name} />{`${TITLE_SEPARATOR}${product.data.descriptor}`}
+              </a>
+            ) : (
+              <>
+                <ProductName name={product.data.name} />{`${TITLE_SEPARATOR}${product.data.descriptor}`}
+              </>
+            )}
+          </p>
+          <h3 class="surfaces__title">{item.title}</h3>
+          {item.text && <p class="surfaces__lead">{item.text}</p>}
+        </div>
+        <div class="surfaces__figure">
+          <Mockup mockup={mockup} />
+        </div>
       </li>
     ))
   }
-</ul>
+</ol>
 
 <style>
   .surfaces {
     display: grid;
-    gap: var(--space-lg);
+    gap: var(--space-2xl);
     padding: 0;
     list-style: none;
   }
 
   .surfaces__item {
     display: grid;
+    gap: var(--space-lg);
+    min-width: 0;
+  }
+
+  .surfaces__text {
+    display: grid;
+    align-content: start;
     gap: var(--space-xs);
     min-width: 0;
+    max-width: var(--measure);
+  }
+
+  .surfaces__product {
+    color: var(--color-text-muted);
+  }
+
+  .surfaces__title {
+    hyphens: auto;
+  }
+
+  .surfaces__figure {
+    min-width: 0;
+  }
+
+  @media (width >= 64rem) {
+    .surfaces__item {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      align-items: center;
+    }
+
+    .surfaces__item:nth-child(even) .surfaces__text {
+      order: 2;
+    }
   }
 </style>
