@@ -680,9 +680,12 @@ describe('ep04: вид со сценарием', () => {
     });
   });
 
-  it('соглашение: у каждого вида есть kinds/{PascalCase(kind)}.astro', () => {
+  it('соглашение: у каждого вида есть kinds/{PascalCase(kind)}.astro; переименованный вид теряет разрешение цикла', () => {
     const dir = kitWith(SCENARIO_FILE, (s) => s);
     renameSync(join(dir, SCENARIO_FILE), join(dir, 'kinds/PackFlow.astro'));
-    expect(checkKit(dir)).toEqual(['kinds/Packflow.astro: нет файла вида «packflow» (соглашение kinds/{PascalCase(kind)}.astro)']);
+    expect(checkKit(dir)).toEqual([
+      'kinds/PackFlow.astro: бесконечная анимация (infinite)',
+      'kinds/Packflow.astro: нет файла вида «packflow» (соглашение kinds/{PascalCase(kind)}.astro)',
+    ]);
   });
 });

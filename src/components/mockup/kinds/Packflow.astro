@@ -1,17 +1,333 @@
 ---
 // Вид `packflow` — сценарий упаковщика Belka PackApp (вид со сценарием, `SCENARIO_KINDS`).
-// Скелет до T05 ep04: только рамка окна с приложением и экраном из данных, без кадров и без
-// анимации. Строк нет.
+// Кадр — полный снимок экрана: рельс шагов с активным, шапка (стол, роль), экран шага (подсказка,
+// поле скана, заказ, коробка, прогресс, товар, код маркировки, этикетка, статус, кнопка — что задано
+// в кадре) и журнал со строками кадров `1…k`. Все `PACKFLOW_FRAMES` кадров лежат в одной ячейке
+// грида: высота фигуры — самый высокий кадр, `check-layout` меряет каждый.
+//
+// Движение — только `opacity` кадров. Вне `prefers-reduced-motion: no-preference` виден
+// `staticFrame`, остальные прозрачны. Под `no-preference` прозрачны все, а одна `@keyframes` со
+// `step-end` показывает кадр `k` первую шестую цикла с задержкой `(k - 1)` кадров: в любой момент
+// виден ровно один кадр. Пауза — `--mock-play` от флажка фигуры (`Mockup.astro`). Узкая фигура:
+// рельс — только номера, журнал скрыт целиком, экран шага — целиком. Строк нет.
+import { groupDigits, ofTotal } from '../../../lib/mock-format';
 import type { MockupOf } from '../kinds';
+import FakeButton from '../ui/FakeButton.astro';
+import GridRow from '../ui/GridRow.astro';
+import Panel from '../ui/Panel.astro';
+import Progress from '../ui/Progress.astro';
+import ScanField from '../ui/ScanField.astro';
+import StatusPill from '../ui/StatusPill.astro';
 import WindowFrame from '../ui/WindowFrame.astro';
 
 interface Props {
   mockup: MockupOf<'packflow'>;
 }
 
-const { app, screen } = Astro.props.mockup;
+const { app, screen, panels, station, operator, steps, frames, staticFrame } = Astro.props.mockup;
 ---
 
 <WindowFrame app={app} screen={screen}>
-  <div class="packflow"></div>
+  <div class="packflow">
+    {
+      frames.map((frame, i) => (
+        <div class:list={['packflow__frame', { 'packflow__frame--static': i + 1 === staticFrame }]}>
+          <div class="packflow__rail">
+            {steps.map((label, s) => (
+              <div
+                class:list={[
+                  'packflow__step',
+                  { 'packflow__step--done': s + 1 < frame.step, 'packflow__step--active': s + 1 === frame.step },
+                ]}
+              >
+                <div class="packflow__step-num">{groupDigits(s + 1)}</div>
+                <div class="packflow__step-label">{label}</div>
+              </div>
+            ))}
+          </div>
+          <div class="packflow__body">
+            <div class="packflow__work">
+              <div class="packflow__head">
+                <div class="packflow__field">
+                  <div class="packflow__muted">{station.label}</div>
+                  <div class="packflow__code">
+                    <span data-voice="raw">{station.code}</span>
+                  </div>
+                </div>
+                {operator && <div class="packflow__muted">{operator}</div>}
+              </div>
+              <div class="packflow__prompt">{frame.prompt}</div>
+              <ScanField label={frame.scan.label} value={frame.scan.value} />
+              {(frame.order || frame.box) && (
+                <div class="packflow__fields">
+                  {frame.order && (
+                    <div class="packflow__field">
+                      <div class="packflow__muted">{frame.order.label}</div>
+                      <div class="packflow__code">
+                        <span data-voice="raw">{frame.order.code}</span>
+                      </div>
+                    </div>
+                  )}
+                  {frame.box && (
+                    <div class="packflow__field">
+                      <div class="packflow__muted">{frame.box.label}</div>
+                      <div class="packflow__code">
+                        <span data-voice="raw">{frame.box.code}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {frame.progress && (
+                <div class="packflow__progress">
+                  <Progress segments={frame.progress} />
+                  <div class="packflow__count">{ofTotal(frame.progress.done, frame.progress.total)}</div>
+                </div>
+              )}
+              {(frame.item || frame.mark) && (
+                <Panel>
+                  {frame.item && (
+                    <div class="packflow__field">
+                      <div>{frame.item.label}</div>
+                      <div class="packflow__code">
+                        <span data-voice="raw">{frame.item.code}</span>
+                      </div>
+                    </div>
+                  )}
+                  {frame.mark && (
+                    <div class="packflow__mark">
+                      <span data-voice="raw">{frame.mark}</span>
+                    </div>
+                  )}
+                </Panel>
+              )}
+              {frame.label && (
+                <div class="packflow__label">
+                  <div class="packflow__muted">{frame.label.template}</div>
+                  <div class="packflow__code">
+                    <span data-voice="raw">{frame.label.expected}</span>
+                  </div>
+                </div>
+              )}
+              {frame.status && <StatusPill label={frame.status.label} tone={frame.status.tone} />}
+              {frame.action && <FakeButton label={frame.action} primary />}
+            </div>
+            <div class="packflow__log">
+              <Panel title={panels.log}>
+                {frames.slice(0, i + 1).map((past) => (
+                  <GridRow cells={[{ text: past.log.time, code: true, muted: true }, { text: past.log.text }]} />
+                ))}
+              </Panel>
+            </div>
+          </div>
+        </div>
+      ))
+    }
+  </div>
 </WindowFrame>
+
+<style>
+  .packflow {
+    display: grid;
+    min-width: 0;
+  }
+
+  /* Все кадры — в одной ячейке: высота фигуры = самый высокий кадр. Вне движения виден только
+     статичный кадр. */
+  .packflow__frame {
+    display: grid;
+    grid-area: 1 / 1;
+    align-content: start;
+    gap: var(--mock-pad);
+    min-width: 0;
+    opacity: 0;
+  }
+
+  .packflow__frame--static {
+    opacity: 1;
+  }
+
+  .packflow__rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-dot-gap);
+    padding: var(--mock-dot-gap);
+    border-radius: var(--mock-radius);
+    background: var(--mock-rail);
+  }
+
+  .packflow__step {
+    display: flex;
+    flex: 1 1 0;
+    gap: var(--mock-dot-gap);
+    align-items: center;
+    min-width: 0;
+    padding: var(--mock-dot-gap) var(--mock-gap);
+    border-radius: var(--mock-radius);
+    color: var(--mock-text-muted);
+  }
+
+  .packflow__step-num {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--mock-row-h);
+    height: var(--mock-row-h);
+    border: var(--border-width) solid var(--mock-line-strong);
+    border-radius: 50%;
+    font-weight: var(--font-weight-bold);
+  }
+
+  .packflow__step--done .packflow__step-num {
+    border-color: var(--mock-tone-ok-bg);
+    background: var(--mock-tone-ok-bg);
+    color: var(--mock-tone-ok-fg);
+  }
+
+  .packflow__step--active {
+    background: var(--mock-nav-active-bg);
+    color: var(--mock-accent-text);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .packflow__step--active .packflow__step-num {
+    border-color: var(--mock-button-bg);
+    background: var(--mock-button-bg);
+    color: var(--mock-on-button);
+  }
+
+  .packflow__step-label {
+    min-width: 0;
+  }
+
+  .packflow__body,
+  .packflow__work,
+  .packflow__log {
+    display: grid;
+    align-content: start;
+    gap: var(--mock-pad);
+    min-width: 0;
+  }
+
+  .packflow__head,
+  .packflow__field,
+  .packflow__label {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .packflow__fields {
+    display: grid;
+    gap: var(--mock-gap);
+  }
+
+  .packflow__muted {
+    color: var(--mock-text-muted);
+  }
+
+  .packflow__code {
+    font-family: var(--font-code);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .packflow__prompt {
+    font-size: var(--mock-font-lg);
+    font-weight: var(--font-weight-heavy);
+    line-height: var(--leading-tight);
+  }
+
+  .packflow__progress {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--mock-gap);
+    align-items: center;
+  }
+
+  .packflow__count {
+    font-weight: var(--font-weight-bold);
+  }
+
+  /* Код маркировки — до mockMarkMax знаков без пробелов: переносится (overflow-wrap фигуры). */
+  .packflow__mark {
+    color: var(--mock-text-muted);
+    font-family: var(--font-code);
+  }
+
+  .packflow__label {
+    padding: var(--mock-pad);
+    border: var(--border-width) dashed var(--mock-line-strong);
+    border-radius: var(--mock-radius);
+    background: var(--mock-panel);
+  }
+
+  .packflow__log {
+    --grid-row-columns: auto minmax(0, 1fr);
+  }
+
+  /* Узкая фигура: рельс — номера шагов, журнал скрыт целиком; экран шага — целиком. */
+  @container (width < 30rem) {
+    .packflow__step {
+      flex: none;
+    }
+
+    .packflow__step-label,
+    .packflow__log {
+      display: none;
+    }
+  }
+
+  @container (width >= 38rem) {
+    .packflow__body {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+  }
+
+  /* Цикл кадров: кадр `k` виден первую шестую цикла (PACKFLOW_FRAMES = 6) с задержкой `k - 1`
+     кадров. 1/6 не записывается десятичной дробью, а минификатор CSS оставляет 4 знака: граница
+     16.6666% чуть раньше 1/6, поэтому на стыке кадров виден ровно один кадр (с 16.6667% уходящий
+     гас бы позже, чем загорается следующий), а окно без кадра перед стыком — около 10 мкс при
+     цикле 15 с, меньше кадра отрисовки. Статичный кадр тоже прозрачен до своей очереди, иначе в первом цикле он висел бы
+     поверх кадров до него. Пауза — `--mock-play` от флажка фигуры, после сокращения `animation`. */
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes packflow-frame {
+      0% {
+        opacity: 1;
+      }
+
+      16.6666%,
+      100% {
+        opacity: 0;
+      }
+    }
+
+    .packflow__frame,
+    .packflow__frame--static {
+      opacity: 0;
+      animation: packflow-frame calc(var(--mock-flow-frame) * 6) step-end infinite;
+      animation-play-state: var(--mock-play, running);
+    }
+
+    .packflow__frame:nth-child(2) {
+      animation-delay: var(--mock-flow-frame);
+    }
+
+    .packflow__frame:nth-child(3) {
+      animation-delay: calc(var(--mock-flow-frame) * 2);
+    }
+
+    .packflow__frame:nth-child(4) {
+      animation-delay: calc(var(--mock-flow-frame) * 3);
+    }
+
+    .packflow__frame:nth-child(5) {
+      animation-delay: calc(var(--mock-flow-frame) * 4);
+    }
+
+    .packflow__frame:nth-child(6) {
+      animation-delay: calc(var(--mock-flow-frame) * 5);
+    }
+  }
+</style>
