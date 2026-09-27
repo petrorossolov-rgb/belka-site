@@ -1,14 +1,171 @@
 ---
-// Вид `console` (Веб-консоль): минимальный вид до T12/T13 — рамка с приложением и экраном. Строк нет:
-// всё приходит из данных мокапа (`src/content/mockups/*.yaml`).
-import WindowFrame from '../ui/WindowFrame.astro';
+// Вид `console` — веб-консоль Belka WMS, экран «Монитор склада»: рейл разделов, показатели,
+// загрузка зон, волны и исключения. Раскладка — по ширине фигуры (container queries):
+// узкая (до 30rem) — без рейла, два показателя в ряд, загрузка зон, три волны, исключения скрыты;
+// средняя — все показатели и исключения; широкая (от 38rem) — рейл слева, волны и исключения
+// рядом. Данные не прячутся обрезкой: скрываются только панели и пункты целиком. Строк нет.
+import { percent } from '../../../lib/mock-format';
 import type { MockupOf } from '../kinds';
+import Kpi from '../ui/Kpi.astro';
+import Panel from '../ui/Panel.astro';
+import Progress from '../ui/Progress.astro';
+import StatusPill from '../ui/StatusPill.astro';
+import Tiles from '../ui/Tiles.astro';
+import WindowFrame from '../ui/WindowFrame.astro';
 
 interface Props {
   mockup: MockupOf<'console'>;
 }
 
-const { mockup } = Astro.props;
+const { app, screen, panels, nav, kpis, zones, waves, exceptions } = Astro.props.mockup;
 ---
 
-<WindowFrame app={mockup.app} screen={mockup.screen} />
+<WindowFrame app={app} screen={screen}>
+  <div class="console">
+    <div class="console__rail">
+      {nav.map((label, i) => <div class:list={['console__nav', { 'console__nav--active': i === 0 }]}>{label}</div>)}
+    </div>
+    <div class="console__main">
+      <div class="console__kpis">
+        {kpis.map((kpi) => <Kpi label={kpi.label} value={kpi.value} unit={kpi.unit} />)}
+      </div>
+      <Panel title={panels.zones}>
+        <Tiles items={zones} />
+      </Panel>
+      <div class="console__lists">
+        <Panel title={panels.waves}>
+          {
+            waves.map((wave) => (
+              <div class="console__wave">
+                <div class="console__code">
+                  <span data-voice="raw">{wave.code}</span>
+                </div>
+                <StatusPill label={wave.status.label} tone={wave.status.tone} />
+                <Progress value={wave.progress} />
+                <div class="console__pct">{percent(wave.progress)}</div>
+              </div>
+            ))
+          }
+        </Panel>
+        {
+          exceptions.length > 0 && (
+            <div class="console__exceptions">
+              <Panel title={panels.exceptions}>
+                {exceptions.map((exception) => (
+                  <div class={`console__exception console__exception--${exception.tone}`}>{exception.text}</div>
+                ))}
+              </Panel>
+            </div>
+          )
+        }
+      </div>
+    </div>
+  </div>
+</WindowFrame>
+
+<style>
+  .console {
+    display: grid;
+    gap: var(--mock-pad);
+    min-width: 0;
+  }
+
+  .console__rail {
+    display: none;
+    align-content: start;
+    gap: var(--mock-dot-gap);
+  }
+
+  .console__nav {
+    padding: var(--mock-dot-gap) var(--mock-gap);
+    border-radius: var(--mock-radius);
+    color: var(--mock-text-muted);
+  }
+
+  .console__nav--active {
+    background: var(--mock-nav-active-bg);
+    color: var(--mock-accent-text);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .console__main,
+  .console__lists {
+    display: grid;
+    align-content: start;
+    gap: var(--mock-pad);
+    min-width: 0;
+  }
+
+  .console__kpis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mock-gap);
+  }
+
+  .console__wave {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    gap: var(--mock-gap);
+    align-items: center;
+    min-height: var(--mock-row-h);
+    border-block-end: var(--border-width) solid var(--mock-line);
+  }
+
+  .console__code {
+    font-family: var(--font-code);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .console__pct {
+    color: var(--mock-text-muted);
+    text-align: end;
+  }
+
+  .console__exception {
+    padding: var(--mock-dot-gap) var(--mock-gap);
+    border-inline-start: var(--mock-mark-w) solid var(--mock-tone-neutral-fg);
+    background: var(--mock-bg);
+  }
+
+  .console__exception--ok {
+    border-inline-start-color: var(--mock-tone-ok-fg);
+  }
+
+  .console__exception--warn {
+    border-inline-start-color: var(--mock-tone-warn-fg);
+  }
+
+  .console__exception--risk {
+    border-inline-start-color: var(--mock-tone-risk-fg);
+  }
+
+  /* Узкая фигура: два показателя, три волны, без исключений. */
+  @container (width < 30rem) {
+    /* Показатель — корень компонента Kpi со своим cid: селектор ребёнка — через :global. */
+    .console__kpis > :global(:nth-child(n + 3)),
+    .console__wave:nth-child(n + 4),
+    .console__exceptions {
+      display: none;
+    }
+  }
+
+  @container (width >= 30rem) {
+    .console__kpis {
+      grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    }
+  }
+
+  @container (width >= 38rem) {
+    .console {
+      grid-template-columns: var(--mock-rail-w) minmax(0, 1fr);
+    }
+
+    .console__rail {
+      display: grid;
+    }
+
+    .console__lists {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+  }
+</style>

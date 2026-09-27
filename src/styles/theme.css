@@ -143,6 +143,7 @@
   --mock-accent-text: var(--bk-rust-600);                       /* мелкий текст акцентом */
   --mock-bar: var(--bk-rust-500);                               /* заполненная часть полосы */
   --mock-bar-track: var(--bk-oat-200);                          /* пустая часть полосы */
+  --mock-nav-active-bg: var(--bk-rust-100);                     /* активный пункт рейла консоли */
   --mock-button-bg: var(--bk-rust-600);
   --mock-on-button: var(--bk-milk-50);
   --mock-tone-ok-fg: #3F653B;
@@ -191,6 +192,7 @@
   --mock-spark-h: 1.75em;                                       /* спарклайн KPI */
   --mock-bar-radius: 0.125em;                                   /* верх столбца */
   --mock-tile-min: 9em;                                         /* плитка загрузки в авто-сетке */
+  --mock-mark-w: 0.25em;                                        /* цветная метка тона слева от строки */
 
   /* Движение */
   --motion-duration-fast: var(--dur-fast);

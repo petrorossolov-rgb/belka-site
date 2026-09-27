@@ -93,6 +93,7 @@ describe('мокап-кит: светлая палитра и ТСД', () => {
     ...TONES.map((tone): [string, string, number] => [`--mock-tone-${tone}-fg`, `--mock-tone-${tone}-bg`, 4.5]),
     ...TONES.map((tone): [string, string, number] => [`--mock-tone-${tone}-fg`, '--mock-panel', 4.5]),
     ['--mock-on-button', '--mock-button-bg', 4.5],
+    ['--mock-accent-text', '--mock-nav-active-bg', 4.5],
     // Крупные значения акцентом и графика.
     ['--mock-accent', '--mock-panel', 3.0],
     ['--mock-bar', '--mock-bar-track', 3.0],

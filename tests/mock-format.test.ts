@@ -100,18 +100,18 @@ describe('withUnit', () => {
   const NBSP = String.fromCharCode(0xa0);
 
   it('число и единица — через неразрывный пробел; без единицы — только число', () => {
-    expect(withUnit(4, 'count', 'уп.')).toBe(`4${NBSP}уп.`);
-    expect(withUnit(12500, 'count', 'шт.')).toBe(`12${THIN}500${NBSP}шт.`);
-    expect(withUnit(24.5, 'decimal', 'кг')).toBe(`24,5${NBSP}кг`);
+    expect(withUnit(4, 'уп.')).toBe(`4${NBSP}уп.`);
+    expect(withUnit(12500, 'шт.')).toBe(`12${THIN}500${NBSP}шт.`);
+    expect(withUnit(24.5, 'кг', 'decimal')).toBe(`24,5${NBSP}кг`);
     expect(withUnit(1284)).toBe('1284');
-    expect(withUnit(1284, 'count', '')).toBe('1284');
+    expect(withUnit(1284, '')).toBe('1284');
   });
 
   it('у процента единица — знак процента, своя единица не добавляется', () => {
-    expect(withUnit(82, 'percent', '%')).toBe(`82${NARROW}%`);
+    expect(withUnit(82, '%', 'percent')).toBe(`82${NARROW}%`);
   });
 
   it('проходит checkText (V4)', () => {
-    expect(checkText(`Значение ${withUnit(12500, 'count', 'шт.')} на экране`)).toEqual([]);
+    expect(checkText(`Значение ${withUnit(12500, 'шт.')} на экране`)).toEqual([]);
   });
 });
