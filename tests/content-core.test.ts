@@ -615,6 +615,35 @@ describe('assertContentIntegrity: страница продукта, мокап�
     });
   });
 
+  describe('9: мокап вида со сценарием в секциях ⇒ site.mockupPauseLabel (ep04)', () => {
+    const flow = block('packapp-surfaces', { view: 'surfaces', items: [surface('packapp-flow', 'packapp')], draft: true });
+    const packapp = pageProduct('packapp', { kind: 'standalone', pageDraft: true, sections: refs('packapp-surfaces') });
+    const scenario = {
+      products: [wms, packapp],
+      blocks: [wmsScope, wmsSurfaces, flow],
+      mockups: [mockup('wms-console'), mockup('packapp-flow', 'packflow')],
+    };
+
+    it('без мокапа со сценарием подпись паузы не нужна', () => {
+      expect(check({})).not.toThrow();
+    });
+
+    it('мокап со сценарием в черновом продукте без подписи — исключение с именем мокапа и site.yaml', () => {
+      expect(check(scenario)).toThrow(
+        /site\.yaml: на сайте есть мокапы со сценарием \(packapp-flow\), но не задан mockupPauseLabel/,
+      );
+    });
+
+    it('подпись из пробелов — исключение; с подписью — проходит', () => {
+      expect(check({ ...scenario, site: { mockupNote: 'Демо-данные.', mockupPauseLabel: '  ' } })).toThrow(/не задан mockupPauseLabel/);
+      expect(check({ ...scenario, site: { mockupNote: 'Демо-данные.', mockupPauseLabel: 'Пауза' } })).not.toThrow();
+    });
+
+    it('мокап со сценарием в коллекции, но ни в одной секции — подпись не нужна', () => {
+      expect(check({ mockups: [...base.mockups, mockup('packapp-flow', 'packflow')] })).not.toThrow();
+    });
+  });
+
   describe('6: OG — PNG 1200×630 у страницы, продукта и сайта', () => {
     const cases = [
       ['JPG 1200×630', og('jpg')],
