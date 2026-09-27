@@ -1,7 +1,6 @@
 ---
 # Хаб продуктов /products/ (ep03). Тексты утверждены владельцем 2026-09-27: docs/ep03-product-wms/log.md → «Утверждение текстов: wms»
 # (пакет texts/wms.md, коммит d0f9394). Правка — новым циклом runbook, не напрямую.
-# Черновик до снятия в T22: draft: true.
 title: "Продукты платформы"
 description: "Продукты Belka SCM для логистики: Belka WMS — система управления складом, Belka PackApp — упаковка и маркировка, и состав всей платформы."
 nav:
@@ -14,5 +13,5 @@ hero:
 sections:
   - products
   - platform
-draft: true
+draft: false
 ---
