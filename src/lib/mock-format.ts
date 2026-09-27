@@ -45,3 +45,16 @@ export function percent(n: number): string {
   assertFinite(n);
   return `${Number.isInteger(n) ? groupDigits(n) : decimal(n, 1)}${NARROW_NBSP}%`;
 }
+
+/** Неразрывный пробел U+00A0 — между числом и единицей измерения («4 уп.», «24,5 кг»). */
+const NBSP = String.fromCharCode(0xa0);
+
+/** Форма числа в мокапе: целое с разрядами, процент или дробь с одним знаком. */
+export type NumberForm = 'count' | 'percent' | 'decimal';
+
+/** Число в своей форме и единица из данных через неразрывный пробел; у процента единица — знак. */
+export function withUnit(n: number, form: NumberForm = 'count', unit?: string): string {
+  if (form === 'percent') return percent(n);
+  const value = form === 'decimal' ? decimal(n) : groupDigits(n);
+  return unit === undefined || unit === '' ? value : `${value}${NBSP}${unit}`;
+}

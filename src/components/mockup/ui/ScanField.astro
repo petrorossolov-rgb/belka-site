@@ -1,0 +1,68 @@
+---
+// Примитив кита: поле скана — подпись-подсказка и строка с курсором; последний скан — код с
+// `data-voice="raw"`. Анимации курсора нет. Строк нет: всё приходит из данных мокапа.
+interface Props {
+  label: string;
+  value?: string | undefined;
+  dark?: boolean;
+}
+
+const { label, value, dark = false } = Astro.props;
+---
+
+<div class:list={['scan', { 'scan--dark': dark }]}>
+  <div class="scan__label">{label}</div>
+  <div class="scan__line">
+    <span class="scan__caret"></span>
+    {value && <span class="scan__value" data-voice="raw">{value}</span>}
+  </div>
+</div>
+
+<style>
+  .scan {
+    display: grid;
+    gap: var(--mock-gap);
+    min-width: 0;
+    padding: var(--mock-pad);
+    border: var(--mock-scan-border) solid var(--mock-accent);
+    border-radius: var(--mock-radius);
+    background: var(--mock-panel);
+  }
+
+  .scan__label {
+    color: var(--mock-text-muted);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .scan__line {
+    display: flex;
+    gap: var(--mock-gap);
+    align-items: center;
+    min-height: var(--mock-row-h);
+    overflow-wrap: anywhere;
+  }
+
+  .scan__caret {
+    width: var(--mock-caret-w);
+    height: var(--mock-font-lg);
+    background: var(--mock-accent);
+  }
+
+  .scan__value {
+    font-family: var(--font-code);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .scan--dark {
+    border-color: var(--mock-terminal-accent);
+    background: var(--mock-terminal-panel);
+  }
+
+  .scan--dark .scan__label {
+    color: var(--mock-terminal-muted);
+  }
+
+  .scan--dark .scan__caret {
+    background: var(--mock-terminal-accent);
+  }
+</style>

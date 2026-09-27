@@ -1,0 +1,35 @@
+---
+// Примитив кита: строка заголовка экрана внутри окна — название и необязательная подпись справа
+// (период, смена, заказ). Строк нет: всё приходит из данных мокапа.
+interface Props {
+  title: string;
+  meta?: string | undefined;
+}
+
+const { title, meta } = Astro.props;
+---
+
+<div class="appbar">
+  <div class="appbar__title">{title}</div>
+  {meta && <div class="appbar__meta">{meta}</div>}
+</div>
+
+<style>
+  .appbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .appbar__title {
+    font-size: var(--mock-font-lg);
+    font-weight: var(--font-weight-heavy);
+    line-height: var(--leading-tight);
+  }
+
+  .appbar__meta {
+    color: var(--mock-text-muted);
+  }
+</style>

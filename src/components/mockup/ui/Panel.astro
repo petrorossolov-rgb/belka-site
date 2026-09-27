@@ -1,0 +1,37 @@
+---
+// Примитив кита: панель на светлом окне — необязательный заголовок и содержимое-слот.
+// Строк нет: заголовок приходит из данных мокапа.
+interface Props {
+  title?: string | undefined;
+}
+
+const { title } = Astro.props;
+---
+
+<div class="panel">
+  {title && <div class="panel__title">{title}</div>}
+  <div class="panel__body"><slot /></div>
+</div>
+
+<style>
+  .panel {
+    display: grid;
+    align-content: start;
+    gap: var(--mock-gap);
+    min-width: 0;
+    padding: var(--mock-pad);
+    border: var(--border-width) solid var(--mock-line);
+    border-radius: var(--mock-radius);
+    background: var(--mock-panel);
+  }
+
+  .panel__title {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .panel__body {
+    display: grid;
+    gap: var(--mock-gap);
+    min-width: 0;
+  }
+</style>

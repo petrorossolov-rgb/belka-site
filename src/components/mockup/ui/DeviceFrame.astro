@@ -1,0 +1,55 @@
+---
+// Примитив кита: корпус ТСД — тёмная палитра `--mock-terminal-*`, строка статуса
+// (приложение и экран) и тело-слот. Строк нет: всё приходит из данных мокапа.
+interface Props {
+  app: string;
+  screen: string;
+}
+
+const { app, screen } = Astro.props;
+---
+
+<div class="device">
+  <div class="device__screen">
+    <div class="device__status">
+      <div class="device__app">{app}</div>
+      <div class="device__title">{screen}</div>
+    </div>
+    <div class="device__body"><slot /></div>
+  </div>
+</div>
+
+<style>
+  .device {
+    width: 100%;
+    max-width: var(--mock-device-max);
+    margin-inline: auto;
+    padding: var(--mock-device-bezel);
+    border-radius: var(--mock-device-radius);
+    background: var(--mock-device-body);
+  }
+
+  .device__screen {
+    display: grid;
+    gap: var(--mock-pad);
+    min-width: 0;
+    padding: var(--mock-pad);
+    border-radius: var(--mock-device-screen-radius);
+    background: var(--mock-terminal-bg);
+    color: var(--mock-terminal-text);
+  }
+
+  .device__status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    justify-content: space-between;
+    color: var(--mock-terminal-muted);
+  }
+
+  .device__body {
+    display: grid;
+    gap: var(--mock-pad);
+    min-width: 0;
+  }
+</style>

@@ -1,0 +1,69 @@
+---
+// Примитив кита: окно приложения — шапка (три точки, приложение, экран) и тело-слот.
+// Строк нет: `app` и `screen` приходят из данных мокапа.
+interface Props {
+  app: string;
+  screen: string;
+}
+
+const { app, screen } = Astro.props;
+---
+
+<div class="window">
+  <div class="window__bar">
+    <div class="window__dots"><span></span><span></span><span></span></div>
+    <div class="window__app">{app}</div>
+    <div class="window__screen">{screen}</div>
+  </div>
+  <div class="window__body"><slot /></div>
+</div>
+
+<style>
+  .window {
+    display: grid;
+    min-width: 0;
+    border: var(--border-width) solid var(--mock-line-strong);
+    border-radius: var(--mock-window-radius);
+    background: var(--mock-bg);
+    color: var(--mock-text);
+  }
+
+  .window__bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    align-items: center;
+    padding: var(--mock-gap) var(--mock-pad);
+    border-block-end: var(--border-width) solid var(--mock-line);
+    border-start-start-radius: var(--mock-window-radius);
+    border-start-end-radius: var(--mock-window-radius);
+    background: var(--mock-rail);
+  }
+
+  .window__dots {
+    display: flex;
+    gap: var(--mock-dot-gap);
+  }
+
+  .window__dots > span {
+    width: var(--mock-dot);
+    height: var(--mock-dot);
+    border-radius: 50%;
+    background: var(--mock-line-strong);
+  }
+
+  .window__app {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .window__screen {
+    color: var(--mock-text-muted);
+  }
+
+  .window__body {
+    display: grid;
+    gap: var(--mock-pad);
+    min-width: 0;
+    padding: var(--mock-pad);
+  }
+</style>

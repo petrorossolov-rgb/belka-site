@@ -1,0 +1,14 @@
+---
+// Вид `console` (Веб-консоль): минимальный вид до T12/T13 — рамка с приложением и экраном. Строк нет:
+// всё приходит из данных мокапа (`src/content/mockups/*.yaml`).
+import WindowFrame from '../ui/WindowFrame.astro';
+import type { MockupOf } from '../kinds';
+
+interface Props {
+  mockup: MockupOf<'console'>;
+}
+
+const { mockup } = Astro.props;
+---
+
+<WindowFrame app={mockup.app} screen={mockup.screen} />

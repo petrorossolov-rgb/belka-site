@@ -116,8 +116,8 @@ describe('мокап-кит: светлая палитра и ТСД', () => {
       (name) => name.startsWith('--mock-') && /^(#|var\(--bk-)/.test(theme.get(name) ?? ''),
     );
     const paired = new Set(pairs.flatMap(([fg, bg]) => [fg, bg]));
-    // Линии и пустые сегменты — разделители, не носители смысла: пары им не нужны.
-    const decorative = ['--mock-line', '--mock-line-strong', '--mock-terminal-line', '--mock-terminal-todo'];
+    // Линии, пустые сегменты и корпус ТСД — разделители и рамка, не носители смысла: пары им не нужны.
+    const decorative = ['--mock-line', '--mock-line-strong', '--mock-terminal-line', '--mock-terminal-todo', '--mock-device-body'];
     expect(colors.filter((name) => !paired.has(name) && !decorative.includes(name))).toEqual([]);
   });
 

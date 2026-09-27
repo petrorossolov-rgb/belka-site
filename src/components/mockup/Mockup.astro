@@ -1,0 +1,49 @@
+---
+// Единственная точка вывода мокапа (ep03): `<figure>` → вид по `kind` из `MOCKUP_KINDS` →
+// `<figcaption>` = подпись мокапа и `site.mockupNote` (подпись о демо-данных у каждой фигуры —
+// структурно, Constitution 1). Внутренность — `aria-hidden="true"` и `inert`: скринридер читает
+// только подпись, сотни ячеек не фокусируются. Корень — query-контейнер: вид перестраивается по
+// ширине фигуры, а не окна; кегль `--mock-font` (cqi) стоит на потомке корня. Строк нет.
+import { MOCKUP_KINDS } from './kinds';
+import { getSite, type Mockup } from '../../lib/content';
+
+interface Props {
+  mockup: Mockup;
+}
+
+const { data } = Astro.props.mockup;
+const site = await getSite();
+// Сужение объединения видов до компонента своего вида TypeScript через индекс не выводит:
+// карта типизирована по видам (`MOCKUP_KINDS`), здесь вид и данные берутся из одной записи.
+const Kind = MOCKUP_KINDS[data.kind] as (props: { mockup: Mockup['data'] }) => unknown;
+const caption = site.mockupNote === undefined ? data.caption : `${data.caption} ${site.mockupNote}`;
+---
+
+<figure class="mockup">
+  <div class="mockup__screen" aria-hidden="true" inert>
+    <Kind mockup={data} />
+  </div>
+  <figcaption class="mockup__caption">{caption}</figcaption>
+</figure>
+
+<style>
+  .mockup {
+    display: grid;
+    gap: var(--space-sm);
+    min-width: 0;
+    margin: 0;
+    container-type: inline-size;
+  }
+
+  .mockup__screen {
+    min-width: 0;
+    font-family: var(--font-body);
+    font-size: var(--mock-font);
+    line-height: var(--leading-snug);
+  }
+
+  .mockup__caption {
+    color: var(--color-text-muted);
+    font-size: var(--text-small);
+  }
+</style>

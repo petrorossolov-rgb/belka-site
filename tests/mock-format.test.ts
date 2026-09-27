@@ -2,7 +2,7 @@
 // `check-voice`. Особые символы в ожиданиях — через String.fromCharCode, как в модуле.
 import { describe, expect, it } from 'vitest';
 import { checkText } from '../scripts/check-voice.mjs';
-import { decimal, groupDigits, percent } from '../src/lib/mock-format';
+import { decimal, groupDigits, percent, withUnit } from '../src/lib/mock-format';
 
 const THIN = String.fromCharCode(0x2009);
 const NARROW = String.fromCharCode(0x202f);
@@ -93,5 +93,25 @@ describe('совместимость с линтером голоса (V4)', () 
     const intl = new Intl.NumberFormat('ru').format(12500);
     expect(checkText(`Значение ${intl} на экране`).map((hit: { rule: string }) => hit.rule)).toContain('V4');
     expect(checkText('Значение 12500 на экране').map((hit: { rule: string }) => hit.rule)).toContain('V4');
+  });
+});
+
+describe('withUnit', () => {
+  const NBSP = String.fromCharCode(0xa0);
+
+  it('число и единица — через неразрывный пробел; без единицы — только число', () => {
+    expect(withUnit(4, 'count', 'уп.')).toBe(`4${NBSP}уп.`);
+    expect(withUnit(12500, 'count', 'шт.')).toBe(`12${THIN}500${NBSP}шт.`);
+    expect(withUnit(24.5, 'decimal', 'кг')).toBe(`24,5${NBSP}кг`);
+    expect(withUnit(1284)).toBe('1284');
+    expect(withUnit(1284, 'count', '')).toBe('1284');
+  });
+
+  it('у процента единица — знак процента, своя единица не добавляется', () => {
+    expect(withUnit(82, 'percent', '%')).toBe(`82${NARROW}%`);
+  });
+
+  it('проходит checkText (V4)', () => {
+    expect(checkText(`Значение ${withUnit(12500, 'count', 'шт.')} на экране`)).toEqual([]);
   });
 });

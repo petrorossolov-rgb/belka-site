@@ -1,0 +1,67 @@
+---
+// Примитив кита: столбцы — график по часам (`columns`, подписи оси — из данных) или спарклайн
+// (`spark`, без подписей). Высота столбца — доля от максимума в custom property `--v`, график —
+// только CSS. Чисел на графике нет; подписи оси — строки данных, каждая в своём блоке.
+interface Props {
+  values: number[];
+  labels?: string[] | undefined;
+  spark?: boolean;
+}
+
+const { values, labels, spark = false } = Astro.props;
+const max = Math.max(...values, 0);
+const shares = values.map((value) => (max === 0 ? 0 : value / max));
+---
+
+<div class:list={['bars', { 'bars--spark': spark }]}>
+  <div class="bars__plot">
+    {shares.map((share) => <div class="bars__bar" style={`--v: ${share}`} />)}
+  </div>
+  {
+    labels && (
+      <div class="bars__axis">
+        {labels.map((label) => (
+          <div class="bars__label">{label}</div>
+        ))}
+      </div>
+    )
+  }
+</div>
+
+<style>
+  .bars {
+    display: grid;
+    gap: var(--mock-dot-gap);
+    min-width: 0;
+  }
+
+  .bars__plot,
+  .bars__axis {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: var(--mock-dot-gap);
+  }
+
+  .bars__plot {
+    align-items: end;
+    height: var(--mock-chart-h);
+  }
+
+  .bars__bar {
+    height: calc(var(--v) * 100%);
+    min-height: var(--border-width);
+    border-start-start-radius: var(--mock-bar-radius);
+    border-start-end-radius: var(--mock-bar-radius);
+    background: var(--mock-bar);
+  }
+
+  .bars__label {
+    color: var(--mock-text-muted);
+    text-align: center;
+  }
+
+  .bars--spark .bars__plot {
+    height: var(--mock-spark-h);
+  }
+</style>
