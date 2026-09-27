@@ -56,6 +56,8 @@
 ## Follow-ups
 <!-- Tasks deferred from /my-incident or /my-change that need proper implementation later. -->
 
+- [ ] 2026-09-27 Artifact `.lighthouseci` в `gates.yml` содержит только десктоп: `lhci autorun` десктопа (второй шаг) вычищает `.lighthouseci`, и мобильные отчёты (`outputDir ./.lighthouseci/mobile`) до загрузки artifact не доживают. Гейт мобайла при этом честный — утверждения идут в своём шаге («Checking assertions against 4 URL(s), 12 total run(s)»), теряется только вывод для разбора (в т. ч. аудит `font-size`, он только мобильный). Чинить через `/my-change`: отдельный artifact после каждого шага или каталоги вне `.lighthouseci`; проба — в artifact пробного прогона есть оба профиля. Пока мобильные цифры снимаются локально (`lighthouse` по сборке, как в ep03 T14). (ep03 T14)
+
 - [ ] 2026-09-26 Обновить Astro 7.3.4 → 7.3.5 (и последующие патчи) через `/my-change`: после `npm install` — обход `satteri` с актуальной версией (см. Codebase Patterns), полный прогон гейтов. Вне ep02 по плану эпика (plan ep02 → Out of scope). (retro ep02, sync 2026-09-26)
 
 - [ ] 2026-09-26 ep05 (контакты, реквизиты): V4 `check-voice` уронит телефон E.164 и ИНН/ОГРН в подвале — вывод контактов и реквизитов (`Footer.astro`, `footerContacts`/`footerLegal` в `src/lib/content-core.ts`) нужно пометить `data-voice="raw"`, а подписи «ИНН»/«ОГРН» перенести из `src/lib` в контент (Constitution 5). Не ослаблять V4. (/my-verify ep02)
