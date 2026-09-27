@@ -10,7 +10,7 @@
 # обеих сборках; check-layout открывает страницы в системном Chrome раннера.
 # Artifacts: dist-production, dist-staging (только при staging),
 # draft-routes.json (черновые маршруты staging-сборки при site_env=staging,
-# иначе прод-сборки — пустой список), .lighthouseci. Выкладка берёт только
+# иначе прод-сборки — пустой список), lhci-reports. Выкладка берёт только
 # artifact своего окружения.
 # Вход ref (SHA) задаёт промоушн в прод: он проверяет и собирает SHA со стейджинга,
 # а не HEAD ветки, на которой запущен workflow.
@@ -123,13 +123,13 @@ jobs:
         run: npm run lhci:desktop
 
       # Отчёты нужны и при упавшем Lighthouse — для разбора. Это не гейт, а его вывод.
+      # Оба профиля: каталог вне .lighthouseci, который очищает каждый lhci collect.
       - name: Отчёты Lighthouse
         if: success() || failure()
         uses: actions/upload-artifact@v7
         with:
-          name: .lighthouseci
-          path: .lighthouseci/
-          include-hidden-files: true
+          name: lhci-reports
+          path: lhci-reports/
           if-no-files-found: ignore
           retention-days: 14
 

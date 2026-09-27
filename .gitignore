@@ -11,8 +11,10 @@ docs/
 # Окружение и секреты
 .env*
 
-# Отчёты Lighthouse CI
+# Отчёты Lighthouse CI и Vitest
 .lighthouseci/
+/lhci-reports/
+/.vitest/
 
 # Локальные настройки Claude Code
 .claude/settings.local.json

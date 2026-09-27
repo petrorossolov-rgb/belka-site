@@ -1,8 +1,14 @@
 // Общая часть Lighthouse CI (Constitution 6): прод-сборка из ./dist, страницы — из sitemap
 // плюс /404.html (scripts/lhci-urls.mjs), медиана трёх прогонов, порог 0.95 по четырём
 // категориям (tests/lhci-config.test.ts). Порог не снижается (Constitution 8). Отчёты —
-// только в файловую систему (.lighthouseci/<профиль>/), в публичное хранилище не уходят.
+// только в файловую систему (lhci-reports/<профиль>/), в публичное хранилище не уходят.
 const { lhciUrls } = require('./scripts/lhci-urls.mjs');
+
+/**
+ * Каталог отчётов для artifact CI. Вне .lighthouseci: `lhci collect` без --additive очищает
+ * .lighthouseci в начале каждого прогона, и десктоп стирал отчёты мобайла (ep03 T14).
+ */
+const REPORTS_DIR = './lhci-reports';
 
 const CATEGORIES = ['performance', 'accessibility', 'best-practices', 'seo'];
 const MIN_SCORE = 0.95;
@@ -33,10 +39,10 @@ function lhciConfig(profile, settings = {}, distDir = './dist') {
       },
       upload: {
         target: 'filesystem',
-        outputDir: `./.lighthouseci/${profile}`,
+        outputDir: `${REPORTS_DIR}/${profile}`,
       },
     },
   };
 }
 
-module.exports = { lhciConfig };
+module.exports = { lhciConfig, REPORTS_DIR };
