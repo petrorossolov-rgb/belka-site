@@ -52,6 +52,9 @@ const NBSP = String.fromCharCode(0xa0);
 /** Форма числа в мокапе: целое с разрядами, процент или дробь с одним знаком. */
 export type NumberForm = 'count' | 'percent' | 'decimal';
 
+/** Формы по имени: кит передаёт форму константой, а не строковым литералом в шаблоне. */
+export const NUMBER_FORMS = { count: 'count', percent: 'percent', decimal: 'decimal' } as const satisfies Record<NumberForm, NumberForm>;
+
 /** Число в своей форме и единица из данных через неразрывный пробел; у процента единица — знак. */
 export function withUnit(n: number, unit?: string, form: NumberForm = 'count'): string {
   if (form === 'percent') return percent(n);

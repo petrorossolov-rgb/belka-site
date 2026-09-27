@@ -302,6 +302,7 @@ export const mockupSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('pack'),
     ...mockupBase,
+    panels: z.strictObject({ lines: mockLabel }),
     order: z.strictObject({ label: mockLabel, code: mockCode }),
     scan: z.strictObject({ label: mockLabel, last: mockCode }),
     place: z.strictObject({ label: mockLabel, code: mockCode, weight: z.number().nonnegative(), unit: mockLabel }),
@@ -315,6 +316,7 @@ export const mockupSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('dashboard'),
     ...mockupBase,
+    panels: z.strictObject({ processes: mockLabel }),
     period: mockLabel,
     kpis: z
       .array(

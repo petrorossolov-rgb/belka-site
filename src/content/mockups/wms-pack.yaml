@@ -3,6 +3,7 @@ kind: pack
 caption: "Заглушка ep03: подпись фигуры упаковочного стола, близкая по длине к итоговой подписи."
 app: "Стол"
 screen: "Экран 1"
+panels: { lines: "Панель 1" }
 order: { label: "Поле 1", code: "O-0001" }
 scan: { label: "Поле 2", last: "0000000000002" }
 place: { label: "Поле 3", code: "P-0001", weight: 24.5, unit: "ед." }
