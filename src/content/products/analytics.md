@@ -1,7 +1,7 @@
 ---
 name: Belka Analytics
-# Пояснение имени — подпись пункта блока поверхностей на главной; заглушка до утверждения пакета ep03 (T19).
-descriptor: "Заглушка ep03: пояснение имени"
+# Пояснение имени утверждено 2026-09-27: docs/ep03-product-wms/log.md → «Утверждение текстов: wms».
+descriptor: "дашборды и аналитика"
 short: Analytics
 domain: analytics
 kind: platform

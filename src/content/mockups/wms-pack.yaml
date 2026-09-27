@@ -1,18 +1,19 @@
-# Нейтральные демо-значения до утверждения пакета ep03 (T19): в код — только утверждённое.
+# Тексты утверждены владельцем 2026-09-27: docs/ep03-product-wms/log.md → «Утверждение текстов: wms»
+# (пакет texts/wms.md, коммит d0f9394). Правка — новым циклом runbook, не напрямую.
 kind: pack
-caption: "Заглушка ep03: подпись фигуры упаковочного стола, близкая по длине к итоговой подписи."
-app: "Стол"
-screen: "Экран 1"
-panels: { lines: "Панель 1" }
-order: { label: "Поле 1", code: "O-0001" }
-scan: { label: "Поле 2", last: "0000000000002" }
-place: { label: "Поле 3", code: "P-0001", weight: 24.5, unit: "ед." }
+caption: "Упаковочный стол Belka WMS — системы управления складом: строки заказа, скан, текущее место с весом и статус устройств."
+app: "Belka WMS · Упаковка"
+screen: "Упаковочный стол"
+panels: { lines: "Строки заказа" }
+order: { label: "Заказ", code: "SO-48213" }
+scan: { label: "Последний скан", last: "4600000000031" }
+place: { label: "Место 2 из 3", code: "PK-000482", weight: 24.5, unit: "кг" }
 lines:
-  - { label: "Товар 1", code: "SKU-0001", qty: 6, packed: 6 }
-  - { label: "Товар 2", code: "SKU-0002", qty: 4, packed: 4 }
-  - { label: "Товар 3", code: "SKU-0003", qty: 10, packed: 7 }
-  - { label: "Товар 4", code: "SKU-0004", qty: 12, packed: 0 }
+  - { label: "Лента упаковочная 48 мм", code: "SKU-1042", qty: 6, packed: 6 }
+  - { label: "Стрейч-плёнка 500 мм", code: "SKU-1107", qty: 4, packed: 4 }
+  - { label: "Короб 40 × 30 × 30 см", code: "SKU-2210", qty: 10, packed: 7 }
+  - { label: "Перчатки нитриловые, M", code: "SKU-3305", qty: 12, packed: 0 }
 devices:
-  - { label: "Устройство 1", tone: ok }
-  - { label: "Устройство 2", tone: ok }
-  - { label: "Устройство 3", tone: warn }
+  - { label: "Весы", tone: ok }
+  - { label: "Принтер этикеток", tone: ok }
+  - { label: "Принтер документов", tone: warn }
