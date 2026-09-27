@@ -1,0 +1,68 @@
+---
+// Примитив кита: прогресс — полоса по доле `value` (0…100) или сегменты «сделано из всего»
+// (`done`, `total`, как у волны на ТСД). Только графика: чисел и строк нет.
+interface Props {
+  /** Доля в процентах, 0…100. */
+  value?: number | undefined;
+  /** Сегменты: пройдено `done` из `total`. */
+  segments?: { done: number; total: number } | undefined;
+  dark?: boolean;
+}
+
+const { value, segments, dark = false } = Astro.props;
+const steps = segments === undefined ? [] : Array.from({ length: segments.total }, (_, i) => i < segments.done);
+const share = Math.min(Math.max(value ?? 0, 0), 100) / 100;
+---
+
+{
+  segments ? (
+    <div class:list={['segments', { 'segments--dark': dark }]}>
+      {steps.map((done) => (
+        <span class:list={['segments__step', { 'segments__step--done': done }]} />
+      ))}
+    </div>
+  ) : (
+    <div class="progress">
+      <div class="progress__fill" style={`--v: ${share}`} />
+    </div>
+  )
+}
+
+<style>
+  .progress {
+    height: var(--mock-bar-h);
+    border-radius: var(--radius-badge);
+    background: var(--mock-bar-track);
+  }
+
+  .progress__fill {
+    width: calc(var(--v) * 100%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--mock-bar);
+  }
+
+  .segments {
+    display: flex;
+    gap: var(--mock-dot-gap);
+  }
+
+  .segments__step {
+    flex: 1;
+    height: var(--mock-bar-h);
+    border-radius: var(--radius-badge);
+    background: var(--mock-bar-track);
+  }
+
+  .segments__step--done {
+    background: var(--mock-bar);
+  }
+
+  .segments--dark .segments__step {
+    background: var(--mock-terminal-todo);
+  }
+
+  .segments--dark .segments__step--done {
+    background: var(--mock-terminal-done);
+  }
+</style>

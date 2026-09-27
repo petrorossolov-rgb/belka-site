@@ -1,0 +1,25 @@
+# Нейтральные демо-значения до утверждения пакета ep03 (T19): в код — только утверждённое.
+kind: console
+caption: "Заглушка ep03: подпись фигуры веб-консоли, близкая по длине к итоговой подписи экрана."
+app: "Консоль"
+screen: "Экран 1"
+nav: ["Раздел 1", "Раздел 2", "Раздел 3", "Раздел 4", "Раздел 5", "Раздел 6", "Раздел 7"]
+kpis:
+  - { label: "Показатель 1", value: 146 }
+  - { label: "Показатель 2", value: 1284 }
+  - { label: "Показатель 3", value: 12 }
+  - { label: "Показатель 4", value: 37 }
+zones:
+  - { label: "Зона 1", load: 82 }
+  - { label: "Зона 2", load: 64 }
+  - { label: "Зона 3", load: 47 }
+  - { label: "Зона 4", load: 91 }
+waves:
+  - { code: "W-0001", status: { label: "Статус 1", tone: ok }, progress: 92 }
+  - { code: "W-0002", status: { label: "Статус 2", tone: ok }, progress: 64 }
+  - { code: "W-0003", status: { label: "Статус 3", tone: warn }, progress: 38 }
+  - { code: "W-0004", status: { label: "Статус 4", tone: neutral }, progress: 0 }
+exceptions:
+  - { text: "Исключение 1", tone: risk }
+  - { text: "Исключение 2", tone: warn }
+  - { text: "Исключение 3", tone: warn }

@@ -1,0 +1,17 @@
+# Нейтральные демо-значения до утверждения пакета ep03 (T19): в код — только утверждённое.
+kind: pack
+caption: "Заглушка ep03: подпись фигуры упаковочного стола, близкая по длине к итоговой подписи."
+app: "Стол"
+screen: "Экран 1"
+order: { label: "Поле 1", code: "O-0001" }
+scan: { label: "Поле 2", last: "0000000000002" }
+place: { label: "Поле 3", code: "P-0001", weight: 24.5, unit: "ед." }
+lines:
+  - { label: "Товар 1", code: "SKU-0001", qty: 6, packed: 6 }
+  - { label: "Товар 2", code: "SKU-0002", qty: 4, packed: 4 }
+  - { label: "Товар 3", code: "SKU-0003", qty: 10, packed: 7 }
+  - { label: "Товар 4", code: "SKU-0004", qty: 12, packed: 0 }
+devices:
+  - { label: "Устройство 1", tone: ok }
+  - { label: "Устройство 2", tone: ok }
+  - { label: "Устройство 3", tone: warn }

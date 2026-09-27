@@ -1,0 +1,46 @@
+---
+// Примитив кита: статус — тонированная пилюля (`ok | warn | risk | neutral`). Блок, а не
+// строчный элемент: соседний текст не склеивается с подписью статуса. Строк нет.
+import type { MockTone } from '../../../lib/schemas';
+
+interface Props {
+  label: string;
+  tone: MockTone;
+}
+
+const { label, tone } = Astro.props;
+---
+
+<div class={`pill pill--${tone}`}>{label}</div>
+
+<style>
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    padding: var(--mock-pill-pad-block) var(--mock-gap);
+    border-radius: var(--radius-badge);
+    font-weight: var(--font-weight-bold);
+    white-space: nowrap;
+  }
+
+  .pill--ok {
+    background: var(--mock-tone-ok-bg);
+    color: var(--mock-tone-ok-fg);
+  }
+
+  .pill--warn {
+    background: var(--mock-tone-warn-bg);
+    color: var(--mock-tone-warn-fg);
+  }
+
+  .pill--risk {
+    background: var(--mock-tone-risk-bg);
+    color: var(--mock-tone-risk-fg);
+  }
+
+  .pill--neutral {
+    background: var(--mock-tone-neutral-bg);
+    color: var(--mock-tone-neutral-fg);
+  }
+</style>

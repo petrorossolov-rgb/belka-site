@@ -1,0 +1,48 @@
+---
+// Примитив кита: кнопка-картинка — `div`, а не `button`: внутренность мокапа не интерактивна
+// (`inert` у фигуры). Основная — rust-600 с молоком (на rust-500 мелкого текста нет), вторичная —
+// контуром. Строк нет: подпись приходит из данных мокапа.
+interface Props {
+  label: string;
+  primary?: boolean;
+  dark?: boolean;
+}
+
+const { label, primary = false, dark = false } = Astro.props;
+---
+
+<div class:list={['fake-button', { 'fake-button--primary': primary, 'fake-button--dark': dark }]}>{label}</div>
+
+<style>
+  .fake-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--mock-row-h);
+    padding-inline: var(--mock-pad);
+    border: var(--border-width) solid var(--mock-line-strong);
+    border-radius: var(--mock-radius);
+    background: var(--mock-panel);
+    color: var(--mock-text);
+    font-weight: var(--font-weight-bold);
+    text-align: center;
+  }
+
+  .fake-button--primary {
+    border-color: var(--mock-button-bg);
+    background: var(--mock-button-bg);
+    color: var(--mock-on-button);
+  }
+
+  .fake-button--dark {
+    border-color: var(--mock-terminal-line);
+    background: var(--mock-terminal-panel);
+    color: var(--mock-terminal-text);
+  }
+
+  .fake-button--dark.fake-button--primary {
+    border-color: var(--mock-terminal-button-bg);
+    background: var(--mock-terminal-button-bg);
+    color: var(--mock-terminal-on-button);
+  }
+</style>

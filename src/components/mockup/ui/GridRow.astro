@@ -1,0 +1,90 @@
+---
+// Примитив кита: строка таблицы из ячеек-блоков (каждая ячейка — отдельный `div`: линтер голоса
+// склеивает соседние строчные элементы, «Волна 3» и «1284» дали бы «Волна 31284»). Колонки
+// задаёт вид через `--grid-row-columns`. Код в ячейке — с `data-voice="raw"` на самом значении.
+// Строк нет: всё приходит из данных мокапа.
+import type { MockTone } from '../../../lib/schemas';
+
+export interface GridCell {
+  text: string;
+  /** Код (волна, ячейка, артикул, EAN): моноширинно и `data-voice="raw"` на значении. */
+  code?: boolean;
+  /** Число или код — по правому краю. */
+  end?: boolean;
+  muted?: boolean;
+  tone?: MockTone;
+}
+
+interface Props {
+  cells: GridCell[];
+  head?: boolean;
+}
+
+const { cells, head = false } = Astro.props;
+---
+
+<div class:list={['grid-row', { 'grid-row--head': head }]}>
+  {
+    cells.map((cell) => (
+      <div
+        class:list={[
+          'grid-row__cell',
+          { 'grid-row__cell--end': cell.end, 'grid-row__cell--muted': cell.muted },
+          cell.tone && `grid-row__cell--${cell.tone}`,
+        ]}
+      >
+        {cell.code ? <span class="grid-row__code" data-voice="raw">{cell.text}</span> : cell.text}
+      </div>
+    ))
+  }
+</div>
+
+<style>
+  .grid-row {
+    display: grid;
+    grid-template-columns: var(--grid-row-columns, repeat(auto-fit, minmax(0, 1fr)));
+    gap: var(--mock-gap);
+    align-items: center;
+    min-height: var(--mock-row-h);
+    padding-inline: var(--mock-gap);
+    border-block-end: var(--border-width) solid var(--mock-line);
+  }
+
+  .grid-row--head {
+    min-height: auto;
+    color: var(--mock-text-muted);
+  }
+
+  .grid-row__cell {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .grid-row__cell--end {
+    text-align: end;
+  }
+
+  .grid-row__cell--muted {
+    color: var(--mock-text-muted);
+  }
+
+  .grid-row__cell--ok {
+    color: var(--mock-tone-ok-fg);
+  }
+
+  .grid-row__cell--warn {
+    color: var(--mock-tone-warn-fg);
+  }
+
+  .grid-row__cell--risk {
+    color: var(--mock-tone-risk-fg);
+  }
+
+  .grid-row__cell--neutral {
+    color: var(--mock-tone-neutral-fg);
+  }
+
+  .grid-row__code {
+    font-family: var(--font-code);
+  }
+</style>

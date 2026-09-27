@@ -163,6 +163,7 @@
   --mock-terminal-todo: var(--bk-bark-750);
   --mock-terminal-button-bg: var(--bk-rust-600);
   --mock-terminal-on-button: var(--bk-milk-50);
+  --mock-device-body: var(--bk-bark-900);                       /* корпус ТСД вокруг экрана */
 
   /* Кегль мокапа растёт с его контейнером (cqi — от ближайшего query-контейнера-предка:
      ставится на потомка корня фигуры, не на сам корень). Пол 12px — аудит font-size
@@ -180,6 +181,16 @@
   --mock-device-radius: 1.75rem;                                /* 28: корпус ТСД */
   --mock-device-bezel: 0.625rem;                                /* 10: рамка корпуса */
   --mock-device-max: 20rem;                                     /* 320: ширина корпуса ТСД */
+  --mock-device-screen-radius: 1.125rem;                        /* 18: экран внутри корпуса */
+  --mock-dot: 0.625em;                                          /* точки в шапке окна */
+  --mock-dot-gap: 0.25em;                                       /* точки, сегменты, столбцы */
+  --mock-pill-pad-block: 0.125em;
+  --mock-scan-border: 2px;                                      /* рамка поля скана */
+  --mock-caret-w: 0.125em;                                      /* курсор поля скана */
+  --mock-chart-h: 6em;                                          /* график по часам */
+  --mock-spark-h: 1.75em;                                       /* спарклайн KPI */
+  --mock-bar-radius: 0.125em;                                   /* верх столбца */
+  --mock-tile-min: 9em;                                         /* плитка загрузки в авто-сетке */
 
   /* Движение */
   --motion-duration-fast: var(--dur-fast);

@@ -1,0 +1,14 @@
+---
+// Вид `terminal` (ТСД): минимальный вид до T12/T13 — рамка с приложением и экраном. Строк нет:
+// всё приходит из данных мокапа (`src/content/mockups/*.yaml`).
+import DeviceFrame from '../ui/DeviceFrame.astro';
+import type { MockupOf } from '../kinds';
+
+interface Props {
+  mockup: MockupOf<'terminal'>;
+}
+
+const { mockup } = Astro.props;
+---
+
+<DeviceFrame app={mockup.app} screen={mockup.screen} />

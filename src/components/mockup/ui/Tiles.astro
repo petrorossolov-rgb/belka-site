@@ -1,0 +1,55 @@
+---
+// Примитив кита: плитки загрузки — подпись, процент (через `mock-format`) и полоса. Колонки —
+// авто-сетка: на узком контейнере плитки переносятся, а не сжимаются. Строк нет.
+import { percent } from '../../../lib/mock-format';
+import Progress from './Progress.astro';
+
+interface Props {
+  items: { label: string; load: number }[];
+}
+
+const { items } = Astro.props;
+---
+
+<div class="tiles">
+  {
+    items.map((item) => (
+      <div class="tiles__tile">
+        <div class="tiles__head">
+          <div class="tiles__label">{item.label}</div>
+          <div class="tiles__value">{percent(item.load)}</div>
+        </div>
+        <Progress value={item.load} />
+      </div>
+    ))
+  }
+</div>
+
+<style>
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--mock-tile-min), 100%), 1fr));
+    gap: var(--mock-gap);
+  }
+
+  .tiles__tile {
+    display: grid;
+    gap: var(--mock-gap);
+    min-width: 0;
+    padding: var(--mock-pad);
+    border: var(--border-width) solid var(--mock-line);
+    border-radius: var(--mock-radius);
+    background: var(--mock-panel);
+  }
+
+  .tiles__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mock-gap);
+    justify-content: space-between;
+  }
+
+  .tiles__value {
+    font-weight: var(--font-weight-bold);
+  }
+</style>

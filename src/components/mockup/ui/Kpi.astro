@@ -1,0 +1,53 @@
+---
+// Примитив кита: показатель — подпись, значение крупно (число через `mock-format`), единица
+// из данных и необязательный слот под значением (спарклайн). Строк нет.
+import { withUnit, type NumberForm } from '../../../lib/mock-format';
+
+interface Props {
+  label: string;
+  value: number;
+  unit?: string | undefined;
+  form?: NumberForm;
+  dark?: boolean;
+}
+
+const { label, value, unit, form = 'count', dark = false } = Astro.props;
+---
+
+<div class:list={['kpi', { 'kpi--dark': dark }]}>
+  <div class="kpi__label">{label}</div>
+  <div class="kpi__value">{withUnit(value, form, unit)}</div>
+  <slot />
+</div>
+
+<style>
+  .kpi {
+    display: grid;
+    align-content: start;
+    gap: var(--mock-gap);
+    min-width: 0;
+    padding: var(--mock-pad);
+    border: var(--border-width) solid var(--mock-line);
+    border-radius: var(--mock-radius);
+    background: var(--mock-panel);
+  }
+
+  .kpi__label {
+    color: var(--mock-text-muted);
+  }
+
+  .kpi__value {
+    font-size: var(--mock-font-lg);
+    font-weight: var(--font-weight-heavy);
+    line-height: var(--leading-tight);
+  }
+
+  .kpi--dark {
+    border-color: var(--mock-terminal-line);
+    background: var(--mock-terminal-panel);
+  }
+
+  .kpi--dark .kpi__label {
+    color: var(--mock-terminal-muted);
+  }
+</style>
