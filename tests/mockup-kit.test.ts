@@ -16,9 +16,10 @@
 //     `@media (prefers-reduced-motion: no-preference)`; «любая анимация — только под
 //     `no-preference`» действует для всех файлов, как раньше;
 // (2) `input` (только `type="checkbox"`) и `label` — флажок паузы — только в `Mockup.astro`, вне
-//     обёртки `aria-hidden`/`inert` и внутри условного выражения (`&&` или ветка «то»
-//     тернарного) по переменной, чей инициализатор во frontmatter ссылается на `SCENARIO_KINDS`;
-//     в остальных файлах кита эти теги ловит прежнее правило тегов;
+//     обёртки `aria-hidden`/`inert` и без них на себе, внутри условного выражения (`&&` или ветка
+//     «то» тернарного) по переменной, чей инициализатор во frontmatter ссылается на
+//     `SCENARIO_KINDS`; ровно один флажок и одна подпись, `for` подписи — то же значение, что `id`
+//     флажка (T15); в остальных файлах кита эти теги ловит прежнее правило тегов;
 // (3) в файле вида из `SCENARIO_KINDS` каждое правило CSS с `animation` или `animation-name`
 //     содержит `animation-play-state: var(--mock-play, …)` после последнего
 //     сокращённого `animation`: сокращение сбрасывает паузу в `running`.
@@ -269,17 +270,40 @@ function underScenario(ancestors: Node[], variables: Set<string>): boolean {
 function pauseViolations(body: unknown, frontmatter: unknown): string[] {
   const variables = scenarioVariables(frontmatter);
   const errors: string[] = [];
+  const found = new Map<string, Node[][]>([['input', []], ['label', []]]);
+  const hiddenBy = (n: Node) =>
+    n.type === 'JSXElement' &&
+    ((n.openingElement as Node).attributes as Node[]).some((a) => a.type === 'JSXAttribute' && ['aria-hidden', 'inert'].includes(attrName(a)));
   for (const [node, ancestors] of nodesWithAncestors(body)) {
     if (node.type !== 'JSXElement' || !PAUSE_TAGS.has(tagName(node))) continue;
     const tag = tagName(node);
     const attrs = ((node.openingElement as Node).attributes as Node[]).filter((a) => a.type === 'JSXAttribute');
+    found.get(tag)!.push(attrs);
     const type = attrs.find((a) => attrName(a) === 'type')?.value as Node | null | undefined;
     if (tag === 'input' && type?.value !== 'checkbox') errors.push('<input> — только type="checkbox"');
-    const hiddenBy = (n: Node) =>
-      n.type === 'JSXElement' &&
-      ((n.openingElement as Node).attributes as Node[]).some((a) => a.type === 'JSXAttribute' && ['aria-hidden', 'inert'].includes(attrName(a)));
     if (ancestors.some(hiddenBy)) errors.push(`<${tag}> паузы внутри обёртки aria-hidden/inert — флажок не фокусируется`);
+    if (hiddenBy(node)) errors.push(`<${tag}> паузы с aria-hidden/inert — флажок не фокусируется`);
     if (!underScenario(ancestors, variables)) errors.push(`<${tag}> паузы вне условия по SCENARIO_KINDS`);
+  }
+  // Флажок один и связан с подписью: `for` подписи — то же значение, что `id` флажка (литерал
+  // или одна и та же переменная). Подпись не оборачивает флажок, поэтому связь — только так.
+  const [inputs, labels] = [found.get('input')!, found.get('label')!];
+  if (inputs.length + labels.length > 0) {
+    if (inputs.length !== 1 || labels.length !== 1) {
+      errors.push(`флажок паузы — ровно один <input> и один <label>, найдено: ${inputs.length} и ${labels.length}`);
+    } else {
+      const value = (attrs: Node[] | undefined, name: string) => {
+        const v = attrs?.find((a) => attrName(a) === name)?.value as Node | null | undefined;
+        if (!v) return undefined;
+        if (v.type === 'Literal') return `"${String(v.value)}"`;
+        const expression = v.type === 'JSXExpressionContainer' ? unwrap(v.expression as Node) : undefined;
+        return expression?.type === 'Identifier' ? `{${String(expression.name)}}` : undefined;
+      };
+      const id = value(inputs[0], 'id');
+      if (id === undefined || value(labels[0], 'for') !== id) {
+        errors.push('<label for> паузы не совпадает с id флажка — подпись не связана с флажком');
+      }
+    }
   }
   return errors;
 }
@@ -668,6 +692,28 @@ describe('ep04: вид со сценарием', () => {
     it('input не флажок — ошибка', () => {
       const text = kitWith(FIGURE, (s) => withPause(s).replace('<input type="checkbox"', '<input type="text"'));
       expect(checkKit(text)).toEqual(['Mockup.astro: <input> — только type="checkbox"']);
+    });
+
+    it('inert на самом флажке — ошибка (T15)', () => {
+      const self = kitWith(FIGURE, (s) => withPause(s).replace('id={motionId} />', 'id={motionId} inert />'));
+      expect(checkKit(self)).toEqual(['Mockup.astro: <input> паузы с aria-hidden/inert — флажок не фокусируется']);
+    });
+
+    it('второй флажок без id и for под тем же условием — ошибка (T15, Codex)', () => {
+      const second = kitWith(FIGURE, (s) =>
+        withPause(s).replace(PAUSE_ELEMENTS, `${PAUSE_ELEMENTS}        <input type="checkbox" />\n        <label>{site.mockupPauseLabel}</label>\n`),
+      );
+      expect(checkKit(second)).toEqual([
+        'Mockup.astro: флажок паузы — ровно один <input> и один <label>, найдено: 2 и 2',
+      ]);
+    });
+
+    it('подпись без for или с другим значением, чем id флажка, — ошибка (T15)', () => {
+      const message = 'Mockup.astro: <label for> паузы не совпадает с id флажка — подпись не связана с флажком';
+      const noFor = kitWith(FIGURE, (s) => withPause(s).replace(' for={motionId}>', '>'));
+      expect(checkKit(noFor)).toEqual([message]);
+      const other = kitWith(FIGURE, (s) => withPause(s).replace(' for={motionId}>', ' for={id}>'));
+      expect(checkKit(other)).toEqual([message]);
     });
 
     it('input и label в других файлах кита ловятся прежним правилом тегов', () => {
