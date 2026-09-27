@@ -20,4 +20,4 @@ site:
   mockupNote: "Демо-данные."
   # Подпись флажка паузы у фигуры вида со сценарием (ep04) — заглушка до утверждения пакета
   # docs/ep04-product-packapp/texts/packapp.md (T13).
-  mockupPauseLabel: "Заглушка ep04: Пауза"
+  mockupPauseLabel: "Пробный текст: Пауза"
