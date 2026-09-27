@@ -53,7 +53,20 @@ const SURFACE_ITEM_FIELDS = ['mockup', 'product'] as const;
  * Вид мокапа — компонент кита, которым выводится экран (`src/content/mockups/{id}.yaml`).
  * Карта компонентов `MOCKUP_KINDS` живёт в ките; здесь — только список значений.
  */
-export const MOCKUP_KIND_NAMES = ['console', 'terminal', 'pack', 'dashboard'] as const;
+export const MOCKUP_KIND_NAMES = ['console', 'terminal', 'pack', 'dashboard', 'packflow'] as const;
+
+/**
+ * Виды со сценарием (ep04): только им гейт кита разрешает бесконечный цикл кадров, и только у
+ * их фигуры `Mockup.astro` выводит флажок паузы (`site.mockupPauseLabel`, правило целостности 9).
+ */
+export const SCENARIO_KINDS = ['packflow'] as const satisfies readonly MockupKind[];
+
+/**
+ * Число кадров вида `packflow`. Связано с ключевыми кадрами и задержками в CSS вида
+ * (`kinds/Packflow.astro`): `@keyframes` не параметризуются, поэтому смена числа — правка схемы
+ * и вида, а не данных.
+ */
+export const PACKFLOW_FRAMES = 6;
 
 /** Тон статуса в мокапе: цвет пилюли, строки исключения, устройства. */
 export const MOCK_TONES = ['ok', 'warn', 'risk', 'neutral'] as const;
@@ -81,8 +94,12 @@ export const LIMITS = {
   mockLabelMax: 28,
   /** Код внутри мокапа: волна, ячейка, заказ, артикул. */
   mockCodeMax: 16,
+  /** Код маркировки единицы в кадре `packflow`: без криптохвоста — 31 знак, со скобками AI — до 35. */
+  mockMarkMax: 40,
   /** Подпись о демо-данных у каждой фигуры (`site.mockupNote`). */
   mockupNoteMax: 60,
+  /** Подпись флажка паузы у фигуры вида со сценарием (`site.mockupPauseLabel`). */
+  mockupPauseMax: 40,
 } as const;
 
 // E.164: «+», код страны без ведущего нуля, всего до 15 цифр.
@@ -267,6 +284,25 @@ const mockupBase = {
   screen: mockLabel,
 };
 
+const mockNamedCode = z.strictObject({ label: mockLabel, code: mockCode });
+
+// Кадр вида `packflow` — полный снимок экрана упаковщика: активный шаг рельса, экран шага и
+// строка журнала этого кадра (кадр `k` выводит строки `1…k`, порядок журнала и кадров один).
+const packflowFrame = z.strictObject({
+  step: z.int().min(1),
+  prompt: mockLabel,
+  scan: z.strictObject({ label: mockLabel, value: mockCode.optional() }),
+  order: mockNamedCode.optional(),
+  box: mockNamedCode.optional(),
+  progress: z.strictObject({ done: mockCount, total: mockCount }).optional(),
+  item: mockNamedCode.optional(),
+  mark: z.string().min(1).max(LIMITS.mockMarkMax).optional(),
+  label: z.strictObject({ template: mockLabel, expected: mockCode }).optional(),
+  status: mockStatus.optional(),
+  action: mockLabel.optional(),
+  log: z.strictObject({ time: mockCode, text: mockLabel }),
+});
+
 export const mockupSchema = z.discriminatedUnion('kind', [
   // Веб-консоль WMS: «Монитор склада».
   z.strictObject({
@@ -338,6 +374,30 @@ export const mockupSchema = z.discriminatedUnion('kind', [
     }),
     processes: z.array(z.strictObject({ label: mockLabel, load: mockPercent })).min(3).max(6),
   }),
+  // Belka PackApp: сценарий упаковщика — ровно `PACKFLOW_FRAMES` кадров по кругу (вид со
+  // сценарием, `SCENARIO_KINDS`). `staticFrame` — кадр без движения. Refine стоит на варианте
+  // союза: `z.strictObject(...).superRefine` остаётся объектом, союз его принимает.
+  z
+    .strictObject({
+      kind: z.literal('packflow'),
+      ...mockupBase,
+      panels: z.strictObject({ log: mockLabel }),
+      station: mockNamedCode,
+      operator: mockLabel.optional(),
+      steps: z.array(mockLabel).min(4).max(6),
+      frames: z.array(packflowFrame).length(PACKFLOW_FRAMES),
+      staticFrame: z.int().min(1).max(PACKFLOW_FRAMES),
+    })
+    .superRefine((m, ctx) => {
+      m.frames.forEach((frame, i) => {
+        if (frame.step > m.steps.length) {
+          ctx.addIssue({ code: 'custom', message: `шаг кадра — номер шага рельса (1…${m.steps.length})`, path: ['frames', i, 'step'] });
+        }
+        if (frame.progress && frame.progress.done > frame.progress.total) {
+          ctx.addIssue({ code: 'custom', message: 'готово не больше, чем всего', path: ['frames', i, 'progress', 'done'] });
+        }
+      });
+    }),
 ]);
 
 export const siteSchema = <I extends z.ZodType>(image: ImageFn<I>) =>
@@ -382,6 +442,9 @@ export const siteSchema = <I extends z.ZodType>(image: ImageFn<I>) =>
       // Подпись о демо-данных: кит выводит её у каждой фигуры. Обязательна, если на сайте
       // есть мокап (правило целостности).
       mockupNote: z.string().min(1).max(LIMITS.mockupNoteMax).optional(),
+      // Подпись флажка паузы у фигуры вида со сценарием. Обязательна, если такой мокап стоит на
+      // странице (правило целостности 9).
+      mockupPauseLabel: z.string().min(1).max(LIMITS.mockupPauseMax).optional(),
     })
     // Constitution 4: Метрика — только при включённом флаге юрлица и заданном счётчике.
     .refine(

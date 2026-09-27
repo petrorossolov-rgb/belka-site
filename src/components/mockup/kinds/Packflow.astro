@@ -1,0 +1,17 @@
+---
+// Вид `packflow` — сценарий упаковщика Belka PackApp (вид со сценарием, `SCENARIO_KINDS`).
+// Скелет до T05 ep04: только рамка окна с приложением и экраном из данных, без кадров и без
+// анимации. Строк нет.
+import type { MockupOf } from '../kinds';
+import WindowFrame from '../ui/WindowFrame.astro';
+
+interface Props {
+  mockup: MockupOf<'packflow'>;
+}
+
+const { app, screen } = Astro.props.mockup;
+---
+
+<WindowFrame app={app} screen={screen}>
+  <div class="packflow"></div>
+</WindowFrame>
