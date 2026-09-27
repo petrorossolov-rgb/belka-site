@@ -498,6 +498,15 @@ describe('mockup', () => {
     expect(issuePaths(mockupSchema, { ...consoleMockup, exceptions })).toEqual(['exceptions']);
   });
 
+  it('заголовки панелей стола и дашборда обязательны (ep03 T13)', () => {
+    const { panels: _p, ...packWithout } = pack;
+    expect(issuePaths(mockupSchema, packWithout)).toEqual(['panels']);
+    const { panels: _d, ...dashboardWithout } = dashboard;
+    expect(issuePaths(mockupSchema, dashboardWithout)).toEqual(['panels']);
+    expectLimit(mockupSchema, (v) => ({ ...pack, panels: { lines: v } }), LIMITS.mockLabelMax, 'panels.lines');
+    expectLimit(mockupSchema, (v) => ({ ...dashboard, panels: { processes: v } }), LIMITS.mockLabelMax, 'panels.processes');
+  });
+
   it('заголовки панелей консоли обязательны и строгие (ep03 T12)', () => {
     const { panels: _, ...withoutPanels } = consoleMockup;
     expect(issuePaths(mockupSchema, withoutPanels)).toEqual(['panels']);

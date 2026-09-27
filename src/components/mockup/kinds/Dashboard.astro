@@ -1,14 +1,106 @@
 ---
-// Вид `dashboard` (дашборд Belka Analytics): минимальный вид до T12/T13 — рамка с приложением и экраном. Строк нет:
-// всё приходит из данных мокапа (`src/content/mockups/*.yaml`).
-import WindowFrame from '../ui/WindowFrame.astro';
+// Вид `dashboard` — Belka Analytics, экран «Операции» (название — в шапке окна): период смены,
+// показатели со спарклайнами, график по часам и загрузка процессов. Графики — только CSS
+// (`Bars`, `Progress`). Узкая фигура (до 30rem) — два показателя и шесть часов графика; широкая
+// (от 38rem) — график и процессы рядом. Строк нет.
+import { percent } from '../../../lib/mock-format';
 import type { MockupOf } from '../kinds';
+import Bars from '../ui/Bars.astro';
+import Kpi from '../ui/Kpi.astro';
+import Panel from '../ui/Panel.astro';
+import Progress from '../ui/Progress.astro';
+import WindowFrame from '../ui/WindowFrame.astro';
 
 interface Props {
   mockup: MockupOf<'dashboard'>;
 }
 
-const { mockup } = Astro.props;
+const { app, screen, panels, period, kpis, hourly, processes } = Astro.props.mockup;
 ---
 
-<WindowFrame app={mockup.app} screen={mockup.screen} />
+<WindowFrame app={app} screen={screen}>
+  <div class="dashboard">
+    <div class="dashboard__period">{period}</div>
+    <div class="dashboard__kpis">
+      {
+        kpis.map((kpi) => (
+          <Kpi label={kpi.label} value={kpi.value} unit={kpi.unit}>
+            <Bars values={kpi.trend} spark />
+          </Kpi>
+        ))
+      }
+    </div>
+    <div class="dashboard__charts">
+      <div class="dashboard__hourly">
+        <Panel title={hourly.label}>
+          <Bars values={hourly.points.map((point) => point.value)} labels={hourly.points.map((point) => point.hour)} />
+        </Panel>
+      </div>
+      <Panel title={panels.processes}>
+        {
+          processes.map((process) => (
+            <div class="dashboard__process">
+              <div class="dashboard__process-label">{process.label}</div>
+              <Progress value={process.load} />
+              <div class="dashboard__process-pct">{percent(process.load)}</div>
+            </div>
+          ))
+        }
+      </Panel>
+    </div>
+  </div>
+</WindowFrame>
+
+<style>
+  .dashboard,
+  .dashboard__charts {
+    display: grid;
+    gap: var(--mock-pad);
+    min-width: 0;
+  }
+
+  .dashboard__period {
+    color: var(--mock-text-muted);
+  }
+
+  .dashboard__kpis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mock-gap);
+  }
+
+  .dashboard__process {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+    gap: var(--mock-gap);
+    align-items: center;
+    min-height: var(--mock-row-h);
+  }
+
+  .dashboard__process-pct {
+    color: var(--mock-text-muted);
+    text-align: end;
+  }
+
+  /* Узкая фигура: два показателя и первые шесть часов графика. Столбцы и подписи — элементы
+     дочернего компонента Bars со своим cid, селектор — через :global. */
+  @container (width < 30rem) {
+    .dashboard__kpis > :global(:nth-child(n + 3)),
+    .dashboard__hourly :global(.bars__bar:nth-child(n + 7)),
+    .dashboard__hourly :global(.bars__label:nth-child(n + 7)) {
+      display: none;
+    }
+  }
+
+  @container (width >= 30rem) {
+    .dashboard__kpis {
+      grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    }
+  }
+
+  @container (width >= 38rem) {
+    .dashboard__charts {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+  }
+</style>

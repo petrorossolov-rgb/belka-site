@@ -119,6 +119,7 @@ export const validMockups = {
     caption: 'Подпись фигуры.',
     app: 'Стол',
     screen: 'Упаковка',
+    panels: { lines: 'Панель 1' },
     order: { label: 'Заказ', code: 'O-0001' },
     scan: { label: 'Скан', last: '4600000000001' },
     place: { label: 'Место', code: 'P-0001', weight: 24.5, unit: 'кг' },
@@ -134,6 +135,7 @@ export const validMockups = {
     caption: 'Подпись фигуры.',
     app: 'Аналитика',
     screen: 'Операции',
+    panels: { processes: 'Панель 1' },
     period: 'Смена 1',
     kpis: [
       { label: 'Показатель 1', value: 12500, trend: [1, 2, 3, 4, 5, 6] },
