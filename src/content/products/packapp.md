@@ -1,8 +1,9 @@
 ---
 name: Belka PackApp
-# Страница /products/packapp/ — ep04, черновая до T17; descriptor — заглушка до утверждения пакета
-# docs/ep04-product-packapp/texts/packapp.md (T13). summary и lead утверждены в ep02.
-descriptor: "Заглушка ep04: пояснение имени"
+# Тексты утверждены владельцем 2026-09-27: docs/ep04-product-packapp/log.md → «Утверждение текстов:
+# packapp» (пакет texts/packapp.md, коммит 594e3d9). Правка — новым циклом runbook, не напрямую.
+# Страница /products/packapp/ — ep04, черновая до T17; summary и lead утверждены в ep02.
+descriptor: "стол упаковки и маркировки"
 short: PackApp
 domain: packing
 kind: standalone
@@ -15,5 +16,5 @@ readiness: available  # скрыто: выводится только при sit
 # Страница продукта — герой и секции; тела нет (правило целостности 1).
 sections: [packapp-fit, packapp-surfaces, packapp-control, packapp-marking, packapp-connect]
 seo:
-  description: "Заглушка ep04: описание страницы — стол упаковки и маркировки, сверка скана, этикетка с обратным сканом."
+  description: "Belka PackApp — стол упаковки и маркировки: ведёт упаковщика по заказу, сверяет каждый скан, поддерживает коды маркировки и проверяет этикетку обратным сканом."
 ---

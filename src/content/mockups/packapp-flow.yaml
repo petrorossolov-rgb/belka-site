@@ -1,61 +1,63 @@
-# Сценарий упаковщика Belka PackApp (вид packflow, ep04). До утверждения пакета текстов (T13) —
-# только заглушки и нейтральные технические коды той же длины и структуры; демо-данные со снимков
-# живут в docs/ep04-product-packapp/texts/packapp.md (Constitution 10).
+# Сценарий упаковщика Belka PackApp (вид packflow, ep04). Строки и демо-данные утверждены
+# владельцем 2026-09-27: docs/ep04-product-packapp/log.md → «Утверждение текстов: packapp» (пакет
+# texts/packapp.md, коммит 594e3d9). Данные демонстрационные: марка и префикс заменены, штрихкод
+# вымышленный. Правка — новым циклом runbook, не напрямую.
 kind: packflow
-caption: "Заглушка ep04: подпись фигуры сценария упаковщика — стол, заказ и коробка, товар с кодом, этикетка, обратный скан и завершение."
-app: "Заглушка ep04: приложение"
-screen: "Заглушка ep04: экран"
-panels: { log: "Заглушка ep04: журнал" }
-station: { label: "Заглушка ep04: стол", code: "T-00" }
-operator: "Заглушка ep04: роль"
+caption: "Упаковка заказа в Belka PackApp — столе упаковки и маркировки: стол, заказ и коробка, товар с кодом маркировки, этикетка и её обратный скан."
+app: "Belka PackApp"
+screen: "Упаковка заказа"
+panels: { log: "Журнал действий" }
+station: { label: "Стол", code: "01" }
+operator: "Упаковщик"
 steps:
-  - "Заглушка ep04: шаг 1"
-  - "Заглушка ep04: шаг 2"
-  - "Заглушка ep04: шаг 3"
-  - "Заглушка ep04: шаг 4"
-  - "Заглушка ep04: шаг 5"
+  - "Стол"
+  - "Заказ"
+  - "Товар"
+  - "Этикетка"
+  - "Готово"
 frames:
   - step: 1
-    prompt: "Заглушка ep04: подсказка 1"
-    scan: { label: "Заглушка ep04: скан" }
-    log: { time: "00:00:01", text: "Заглушка ep04: строка 1" }
+    prompt: "Отсканируйте код стола"
+    scan: { label: "Код стола" }
+    log: { time: "10:14:48", text: "Смена открыта на столе" }
   - step: 2
-    prompt: "Заглушка ep04: подсказка 2"
-    scan: { label: "Заглушка ep04: скан", value: "P-00000" }
-    order: { label: "Заглушка ep04: заказ", code: "P-00000" }
-    box: { label: "Заглушка ep04: коробка", code: "C-00000" }
+    prompt: "Отсканируйте товар"
+    scan: { label: "Штрихкод товара" }
+    order: { label: "Заказ", code: "DM-26005766-S001" }
+    box: { label: "Коробка", code: "9900017882468962" }
     progress: { done: 0, total: 5 }
-    log: { time: "00:00:02", text: "Заглушка ep04: строка 2" }
+    log: { time: "10:14:52", text: "Коробка открыта" }
   - step: 3
-    prompt: "Заглушка ep04: подсказка 3"
-    scan: { label: "Заглушка ep04: скан", value: "0000000000000" }
-    order: { label: "Заглушка ep04: заказ", code: "P-00000" }
-    item: { label: "Заглушка ep04: товар", code: "0000000000000" }
-    mark: "(01)00000000000000(21)0000000AAAAAA"
+    prompt: "Отсканируйте товар"
+    scan: { label: "Штрихкод товара", value: "04600000079010" }
+    order: { label: "Заказ", code: "DM-26005766-S001" }
+    item: { label: "Раствор для волос, 1000 мл", code: "DM-99004006" }
+    mark: "(01)04600000079010(21)5hK7qR2xW9tLm"
     progress: { done: 1, total: 5 }
-    log: { time: "00:00:03", text: "Заглушка ep04: строка 3" }
+    log: { time: "10:14:57", text: "Товар отсканирован" }
   - step: 4
-    prompt: "Заглушка ep04: подсказка 4"
-    scan: { label: "Заглушка ep04: скан" }
-    order: { label: "Заглушка ep04: заказ", code: "P-00000" }
-    label: { template: "Заглушка ep04: шаблон", expected: "L-00000" }
+    prompt: "Отсканируйте этикетку"
+    scan: { label: "Код этикетки" }
+    order: { label: "Заказ", code: "DM-26005766-S001" }
+    label: { template: "Товар · 58 × 40 мм", expected: "2000000001050" }
+    status: { label: "Этикетка напечатана", tone: ok }
     progress: { done: 1, total: 5 }
-    log: { time: "00:00:04", text: "Заглушка ep04: строка 4" }
+    log: { time: "10:15:01", text: "Этикетка напечатана" }
   - step: 4
-    prompt: "Заглушка ep04: подсказка 5"
-    scan: { label: "Заглушка ep04: скан", value: "L-00000" }
-    order: { label: "Заглушка ep04: заказ", code: "P-00000" }
-    label: { template: "Заглушка ep04: шаблон", expected: "L-00000" }
-    status: { label: "Заглушка ep04: совпало", tone: ok }
+    prompt: "Отсканируйте этикетку"
+    scan: { label: "Код этикетки", value: "2000000001050" }
+    order: { label: "Заказ", code: "DM-26005766-S001" }
+    label: { template: "Товар · 58 × 40 мм", expected: "2000000001050" }
+    status: { label: "Этикетка подтверждена", tone: ok }
     progress: { done: 1, total: 5 }
-    log: { time: "00:00:05", text: "Заглушка ep04: строка 5" }
+    log: { time: "10:15:02", text: "Этикетка подтверждена" }
   - step: 5
-    prompt: "Заглушка ep04: подсказка 6"
-    scan: { label: "Заглушка ep04: скан" }
-    order: { label: "Заглушка ep04: заказ", code: "P-00000" }
-    box: { label: "Заглушка ep04: коробка", code: "C-00000" }
+    prompt: "Заказ завершён"
+    scan: { label: "Штрихкод товара" }
+    order: { label: "Заказ", code: "DM-26005766-S001" }
+    box: { label: "Коробка", code: "9900017882468962" }
     progress: { done: 5, total: 5 }
-    status: { label: "Заглушка ep04: готово", tone: ok }
-    action: "Заглушка ep04: далее"
-    log: { time: "00:00:06", text: "Заглушка ep04: строка 6" }
+    status: { label: "Коробка закрыта", tone: ok }
+    action: "Следующий заказ"
+    log: { time: "10:15:03", text: "Заказ завершён" }
 staticFrame: 5
