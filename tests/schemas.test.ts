@@ -3,6 +3,7 @@ import { z } from 'astro/zod';
 import {
   BLOCK_VIEWS,
   LIMITS,
+  METRIKA_STATES,
   MOCKUP_KIND_NAMES,
   PACKFLOW_FRAMES,
   SCENARIO_KINDS,
@@ -16,6 +17,8 @@ import {
 import {
   validCardsBlock,
   validCase,
+  validConsent,
+  validLegalLabels,
   validMockups,
   validPage,
   validPlatformProduct,
@@ -60,8 +63,16 @@ describe('LIMITS и BLOCK_VIEWS', () => {
     expect(LIMITS).toMatchObject({ mockMarkMax: 40, mockupPauseMax: 40, mockCodeMax: 16 });
   });
 
+  it('лимиты ep05 — как в плане ep05', () => {
+    expect(LIMITS).toMatchObject({ consentTextMax: 300, buttonMax: 24, legalLabelMax: 40 });
+  });
+
   it('виды секций', () => {
-    expect(BLOCK_VIEWS).toEqual(['text', 'cards', 'steps', 'list', 'platform-map', 'products', 'surfaces']);
+    expect(BLOCK_VIEWS).toEqual(['text', 'cards', 'steps', 'list', 'platform-map', 'products', 'surfaces', 'requisites']);
+  });
+
+  it('состояния флага Метрики', () => {
+    expect(METRIKA_STATES).toEqual(['on', 'off']);
   });
 });
 
@@ -251,6 +262,13 @@ describe('page', () => {
     expect(page.parse(validPage).hero?.heading).toBeUndefined();
     expectLimit(page, (heading) => ({ ...validPage, hero: { heading } }), LIMITS.headingMax, 'hero.heading');
   });
+
+  it('metrikaState необязателен и принимает только on и off (ep05)', () => {
+    expect(page.parse(validPage).metrikaState).toBeUndefined();
+    expect(page.parse({ ...validPage, metrikaState: 'on' }).metrikaState).toBe('on');
+    expect(page.parse({ ...validPage, metrikaState: 'off' }).metrikaState).toBe('off');
+    expect(issuePaths(page, { ...validPage, metrikaState: 'maybe' })).toEqual(['metrikaState']);
+  });
 });
 
 describe('block', () => {
@@ -263,6 +281,7 @@ describe('block', () => {
     'platform-map': { view: 'platform-map', title: 'Состав платформы' },
     products: { view: 'products', title: 'Продукты' },
     surfaces: validSurfacesBlock,
+    requisites: { view: 'requisites', title: 'Реквизиты' },
   } as const;
 
   it('минимальная фикстура есть у каждого вида', () => {
@@ -332,6 +351,17 @@ describe('block', () => {
   ] as const)('view: %s не принимает %s в пункте', (view, field) => {
     const items = [{ title: 'Пункт', text: 'Текст.', [field]: 'wms' }];
     expect(issuePaths(block, { ...minimal[view], items })).toEqual([`items.0.${field}`]);
+  });
+
+  it('view: requisites не принимает пункты (ep05)', () => {
+    expect(issuePaths(block, { ...minimal.requisites, items: [{ title: 'Пункт', text: 'Текст.' }] })).toEqual(['items']);
+  });
+
+  it('metrikaState необязателен и принимает только on и off (ep05)', () => {
+    expect(block.parse(minimal.text).metrikaState).toBeUndefined();
+    expect(block.parse({ ...minimal.text, metrikaState: 'on' }).metrikaState).toBe('on');
+    expect(block.parse({ ...minimal.text, metrikaState: 'off' }).metrikaState).toBe('off');
+    expect(issuePaths(block, { ...minimal.text, metrikaState: 'maybe' })).toEqual(['metrikaState']);
   });
 
   it('link требует page и label', () => {
@@ -444,6 +474,71 @@ describe('site', () => {
     expect(site.parse(validSite).mockupPauseLabel).toBeUndefined();
     expectLimit(site, (mockupPauseLabel) => ({ ...validSite, mockupPauseLabel }), LIMITS.mockupPauseMax, 'mockupPauseLabel');
     expect(issuePaths(site, { ...validSite, mockupPauseLabel: '' })).toEqual(['mockupPauseLabel']);
+  });
+});
+
+describe('site: согласие и подписи реквизитов (ep05)', () => {
+  const withConsent = (consent: object) => ({ ...validSite, consent: { ...validConsent, ...consent } });
+  const withLabels = (legalLabels: object) => ({ ...validSite, legalLabels });
+
+  it('consent и legalLabels необязательны при выключенной Метрике', () => {
+    const parsed = site.parse(validSite);
+    expect(parsed.consent).toBeUndefined();
+    expect(parsed.legalLabels).toBeUndefined();
+    expect(site.safeParse({ ...validSite, consent: validConsent, legalLabels: validLegalLabels }).success).toBe(true);
+  });
+
+  it('refine: Метрика без consent — ошибка по пути consent', () => {
+    const { consent: _, ...withoutConsent } = validSiteWithMetrika;
+    expect(issuePaths(site, withoutConsent)).toEqual(['consent']);
+  });
+
+  it('refine: Метрика с consent проходит, выключенная без consent — тоже', () => {
+    expect(site.safeParse(validSiteWithMetrika).success).toBe(true);
+    const { consent: _, ...withoutConsent } = validSiteWithMetrika;
+    expect(site.safeParse({ ...withoutConsent, flags: { ...withoutConsent.flags, metrikaEnabled: false } }).success).toBe(true);
+  });
+
+  it.each([
+    ['consent.title', LIMITS.headingMax, (v: string) => withConsent({ title: v })],
+    ['consent.text', LIMITS.consentTextMax, (v: string) => withConsent({ text: v })],
+    ['consent.allow', LIMITS.buttonMax, (v: string) => withConsent({ allow: v })],
+    ['consent.deny', LIMITS.buttonMax, (v: string) => withConsent({ deny: v })],
+    ['consent.settings', LIMITS.buttonMax, (v: string) => withConsent({ settings: v })],
+    ['consent.policyLink', LIMITS.linkLabelMax, (v: string) => withConsent({ policyLink: v })],
+    ['consent.consentLink', LIMITS.linkLabelMax, (v: string) => withConsent({ consentLink: v })],
+    ['legalLabels.inn', LIMITS.legalLabelMax, (v: string) => withLabels({ inn: v })],
+    ['legalLabels.ogrn', LIMITS.legalLabelMax, (v: string) => withLabels({ ogrn: v })],
+    ['legalLabels.address', LIMITS.legalLabelMax, (v: string) => withLabels({ address: v })],
+    ['legalLabels.operator', LIMITS.legalLabelMax, (v: string) => withLabels({ operator: v })],
+  ] as const)('ограничивает %s лимитом (%i символов), пустая строка — ошибка', (path, max, build) => {
+    expectLimit(site, build, max, path);
+    expect(issuePaths(site, build(''))).toEqual([path]);
+  });
+
+  it.each(['policyPage', 'consentPage'] as const)('consent.%s — непустой id', (field) => {
+    expect(issuePaths(site, withConsent({ [field]: '' }))).toEqual([`consent.${field}`]);
+  });
+
+  it('consent.version — целое от 1', () => {
+    expect(site.safeParse(withConsent({ version: 2 })).success).toBe(true);
+    expect(issuePaths(site, withConsent({ version: 0 }))).toEqual(['consent.version']);
+    expect(issuePaths(site, withConsent({ version: 1.5 }))).toEqual(['consent.version']);
+  });
+
+  it('consent требует все строки', () => {
+    const { allow: _, ...withoutAllow } = validConsent;
+    expect(issuePaths(site, { ...validSite, consent: withoutAllow })).toEqual(['consent.allow']);
+  });
+
+  it('опечатка в поле consent или legalLabels — ошибка строгого объекта', () => {
+    expect(issuePaths(site, withConsent({ alow: 'Разрешить' }))).toEqual(['consent']);
+    expect(issuePaths(site, withLabels({ inns: 'ИНН' }))).toEqual(['legalLabels']);
+  });
+
+  it('legalLabels: каждое поле необязательно', () => {
+    expect(site.safeParse(withLabels({})).success).toBe(true);
+    expect(site.safeParse(withLabels({ inn: 'ИНН' })).success).toBe(true);
   });
 });
 

@@ -6,6 +6,7 @@
 import CardGrid from './CardGrid.astro';
 import PlatformMap from './PlatformMap.astro';
 import ProductCards from './ProductCards.astro';
+import Requisites from './Requisites.astro';
 import Section from './Section.astro';
 import Steps from './Steps.astro';
 import Surfaces from './Surfaces.astro';
@@ -26,6 +27,7 @@ const VIEWS: Record<BlockView, (props: { block: Block }) => unknown> = {
   'platform-map': PlatformMap,
   products: ProductCards,
   surfaces: Surfaces,
+  requisites: Requisites,
 };
 
 const { blocks } = Astro.props;

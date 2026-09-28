@@ -40,7 +40,23 @@ export const PRODUCT_READINESS = ['planned', 'in-development', 'pilot', 'availab
 export const NAV_PLACEMENTS = ['header', 'footer'] as const;
 
 /** Вид секции — компонент, которым она выводится на странице. */
-export const BLOCK_VIEWS = ['text', 'cards', 'steps', 'list', 'platform-map', 'products', 'surfaces'] as const;
+export const BLOCK_VIEWS = [
+  'text',
+  'cards',
+  'steps',
+  'list',
+  'platform-map',
+  'products',
+  'surfaces',
+  'requisites',
+] as const;
+
+/**
+ * Состояние флага Метрики, при котором текст страницы или блока верен (`metrikaState`).
+ * Правило целостности 10: в production-сборке видимая запись с состоянием, отличным от
+ * `site.flags.metrikaEnabled`, — ошибка (ep05).
+ */
+export const METRIKA_STATES = ['on', 'off'] as const;
 
 /** Виды с пунктами (`items`): хотя бы один пункт. У остальных пунктов нет. */
 const VIEWS_WITH_ITEMS: readonly BlockView[] = ['cards', 'steps', 'list', 'surfaces'];
@@ -100,6 +116,12 @@ export const LIMITS = {
   mockupNoteMax: 60,
   /** Подпись флажка паузы у фигуры вида со сценарием (`site.mockupPauseLabel`). */
   mockupPauseMax: 40,
+  /** Текст плашки согласия: на 360px плашка не выше трети окна (проверяет `check-consent`). */
+  consentTextMax: 300,
+  /** Подпись кнопки плашки согласия и «Настройки cookie» в подвале. */
+  buttonMax: 24,
+  /** Подпись реквизита в подвале и в виде `requisites` (`site.legalLabels`). */
+  legalLabelMax: 40,
 } as const;
 
 // E.164: «+», код страны без ведущего нуля, всего до 15 цифр.
@@ -206,6 +228,8 @@ export const pageSchema = <I extends z.ZodType, R extends z.ZodType>(
       // Секции — записи `blocks`; порядок в списке = порядок на странице.
       sections: z.array(reference('blocks')).default([]),
       draft: z.boolean().default(false),
+      // Текст верен только при этом состоянии флага Метрики (правило целостности 10).
+      metrikaState: z.enum(METRIKA_STATES).optional(),
     })
     .refine((p) => p.ogImage === undefined || p.ogImageAlt !== undefined, {
       message: 'у ogImage должен быть ogImageAlt',
@@ -239,6 +263,8 @@ export const blockSchema = <R extends z.ZodType>(reference: ReferenceFn<R>) =>
         })
         .optional(),
       draft: z.boolean().default(false),
+      // Текст верен только при этом состоянии флага Метрики (правило целостности 10).
+      metrikaState: z.enum(METRIKA_STATES).optional(),
     })
     .superRefine((b, ctx) => {
       if (VIEWS_WITH_ITEMS.includes(b.view)) {
@@ -445,6 +471,33 @@ export const siteSchema = <I extends z.ZodType>(image: ImageFn<I>) =>
       // Подпись флажка паузы у фигуры вида со сценарием. Обязательна, если такой мокап стоит на
       // странице (правило целостности 9).
       mockupPauseLabel: z.string().min(1).max(LIMITS.mockupPauseMax).optional(),
+      // Строки плашки согласия и связь со страницами политики и согласия (ep05). Обязательны при
+      // `metrikaEnabled` (refine ниже); страницы видимы — правило целостности 11.
+      consent: z
+        .strictObject({
+          title: z.string().min(1).max(LIMITS.headingMax),
+          text: z.string().min(1).max(LIMITS.consentTextMax),
+          allow: z.string().min(1).max(LIMITS.buttonMax),
+          deny: z.string().min(1).max(LIMITS.buttonMax),
+          settings: z.string().min(1).max(LIMITS.buttonMax),
+          policyLink: z.string().min(1).max(LIMITS.linkLabelMax),
+          consentLink: z.string().min(1).max(LIMITS.linkLabelMax),
+          policyPage: z.string().min(1),
+          consentPage: z.string().min(1),
+          // Версия текста согласия: входит в запись решения посетителя, новая версия спрашивает снова.
+          version: z.int().min(1),
+        })
+        .optional(),
+      // Подписи реквизитов (Constitution 5: видимый текст — в контенте). Какая подпись обязательна,
+      // решает целостность: та, чьё значение выводится.
+      legalLabels: z
+        .strictObject({
+          inn: z.string().min(1).max(LIMITS.legalLabelMax).optional(),
+          ogrn: z.string().min(1).max(LIMITS.legalLabelMax).optional(),
+          address: z.string().min(1).max(LIMITS.legalLabelMax).optional(),
+          operator: z.string().min(1).max(LIMITS.legalLabelMax).optional(),
+        })
+        .optional(),
     })
     // Constitution 4: Метрика — только при включённом флаге юрлица и заданном счётчике.
     .refine(
@@ -464,11 +517,17 @@ export const siteSchema = <I extends z.ZodType>(image: ImageFn<I>) =>
     .refine((s) => s.seo.defaultOgImage === undefined || s.seo.defaultOgImageAlt !== undefined, {
       message: 'у seo.defaultOgImage должен быть seo.defaultOgImageAlt',
       path: ['seo', 'defaultOgImageAlt'],
+    })
+    // Constitution 4: при Метрике у посетителя спрашивают согласие — строки плашки заданы (ep05).
+    .refine((s) => !s.flags.metrikaEnabled || s.consent !== undefined, {
+      message: 'Метрика требует строк плашки согласия (consent)',
+      path: ['consent'],
     });
 
 export type ProductData = z.output<ReturnType<typeof productSchema<z.ZodType, z.ZodType>>>;
 export type CaseData = z.output<typeof caseSchema>;
 export type BlockView = (typeof BLOCK_VIEWS)[number];
+export type MetrikaState = (typeof METRIKA_STATES)[number];
 export type PageData = z.output<ReturnType<typeof pageSchema<z.ZodType, z.ZodType>>>;
 export type BlockData = z.output<ReturnType<typeof blockSchema<z.ZodType>>>;
 export type SiteData = z.output<ReturnType<typeof siteSchema<z.ZodType>>>;
