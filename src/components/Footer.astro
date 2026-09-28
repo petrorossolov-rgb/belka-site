@@ -1,6 +1,8 @@
 ---
 // Подвал: имя и слоган, © год сборки и имя (с русской редакцией `nameRu`, если она задана);
-// контакты, реквизиты и меню — только непустые.
+// контакты, реквизиты и меню — только непустые. Реквизит — подпись из `site.legalLabels` и
+// значение как есть (`data-voice="raw"`: ИНН и ОГРН — коды, а не числа с разрядами, V4). Оператор
+// ПДн — в политике, не здесь.
 import { getNav, getSite } from '../lib/content';
 import { visibleContacts, visibleLegal } from '../lib/content-core';
 
@@ -42,7 +44,10 @@ const year = new Date().getFullYear();
       legal.length > 0 && (
         <ul class="site-footer__list" role="list">
           {legal.map((item) => (
-            <li>{item.text}</li>
+            <li>
+              {item.label && `${item.label} `}
+              <span data-voice="raw">{item.value}</span>
+            </li>
           ))}
         </ul>
       )
