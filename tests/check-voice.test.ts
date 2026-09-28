@@ -220,6 +220,12 @@ describe('V4 — разряды тонким пробелом', () => {
     expect(rules('<div data-voice="raw"><p><span data-voice="raw">12500</span> и 98765</p></div>')).toEqual([]);
     expect(rules('<p><span data-voice="raw">12500</span> и 98765</p>')).toEqual(['V4']);
   });
+  it('реквизит в подвале (ep05): число в raw проходит, вне raw — V4, подпись вне raw проверяется', () => {
+    expect(rules('<ul><li>ИНН <span data-voice="raw">7700000000</span></li></ul>')).toEqual([]);
+    expect(rules('<ul><li>ИНН 7700000000</li></ul>')).toEqual(['V4']);
+    expect(rules('<ul><li>ИНН! <span data-voice="raw">7700000000</span></li></ul>')).toEqual(['V1']);
+    expect(rules('<dl><dt>ОГРН</dt><dd data-voice="raw">1027700000000</dd><dt>ОГРН 1027700000000</dt></dl>')).toEqual(['V4']);
+  });
   it('коды с буквами и десятичные дроби не числа-разряды', () => {
     expect(rules('<p>SKU12500, коэффициент 0,12500</p>')).toEqual([]);
   });

@@ -221,6 +221,15 @@ export interface FooterSiteLike {
         piiOperator?: string | undefined;
       }
     | undefined;
+  /** Подписи реквизитов — из контента (Constitution 5); значение выводится без подписи, если её нет. */
+  legalLabels?:
+    | {
+        inn?: string | undefined;
+        ogrn?: string | undefined;
+        address?: string | undefined;
+        operator?: string | undefined;
+      }
+    | undefined;
 }
 
 export interface ContactItem {
@@ -230,8 +239,11 @@ export interface ContactItem {
 }
 
 export interface LegalItem {
-  key: 'entityName' | 'inn' | 'ogrn' | 'address';
-  text: string;
+  key: 'entityName' | 'inn' | 'ogrn' | 'address' | 'operator';
+  /** Подпись из `site.legalLabels`; у названия юрлица подписи нет. */
+  label?: string;
+  /** Значение из `site.legal` — выводится как есть (`data-voice="raw"`). */
+  value: string;
 }
 
 /** Значение поля без пробелов по краям; пустая строка — поле не заполнено. */
@@ -252,18 +264,26 @@ export function visibleContacts(site: FooterSiteLike): ContactItem[] {
   return items;
 }
 
-/** Реквизиты подвала — только заполненные поля. Оператор ПДн — в политике (ep05), не здесь. */
-export function visibleLegal(site: FooterSiteLike): LegalItem[] {
-  const items: LegalItem[] = [];
-  const entityName = filled(site.legal?.entityName);
-  const inn = filled(site.legal?.inn);
-  const ogrn = filled(site.legal?.ogrn);
-  const address = filled(site.legal?.address);
-  if (entityName) items.push({ key: 'entityName', text: entityName });
-  if (inn) items.push({ key: 'inn', text: `ИНН ${inn}` });
-  if (ogrn) items.push({ key: 'ogrn', text: `ОГРН ${ogrn}` });
-  if (address) items.push({ key: 'address', text: address });
-  return items;
+/**
+ * Реквизиты — только заполненные поля, в порядке название, inn, ogrn, адрес: подпись из
+ * `site.legalLabels`, значение из `site.legal`. Оператор ПДн (`operator: true`) — только в виде
+ * `requisites` политики, в подвале его нет.
+ */
+export function visibleLegal(site: FooterSiteLike, { operator = false }: { operator?: boolean } = {}): LegalItem[] {
+  const labels = site.legalLabels ?? {};
+  const fields = [
+    ['entityName', site.legal?.entityName, undefined],
+    ['inn', site.legal?.inn, labels.inn],
+    ['ogrn', site.legal?.ogrn, labels.ogrn],
+    ['address', site.legal?.address, labels.address],
+    ...(operator ? ([['operator', site.legal?.piiOperator, labels.operator]] as const) : []),
+  ] as const;
+  return fields.flatMap(([key, raw, rawLabel]) => {
+    const value = filled(raw);
+    if (value === undefined) return [];
+    const label = filled(rawLabel);
+    return [label === undefined ? { key, value } : { key, label, value }];
+  });
 }
 
 function source(entry: EntryLike<unknown>): string {
@@ -278,14 +298,6 @@ export interface IntegritySiteLike extends FooterSiteLike {
   /** Флаги `site.yaml`; без группы оба считаются выключенными. */
   flags?: { legalEntityReady: boolean; metrikaEnabled: boolean } | undefined;
   consent?: { policyPage: string; consentPage: string } | undefined;
-  legalLabels?:
-    | {
-        inn?: string | undefined;
-        ogrn?: string | undefined;
-        address?: string | undefined;
-        operator?: string | undefined;
-      }
-    | undefined;
 }
 
 /**

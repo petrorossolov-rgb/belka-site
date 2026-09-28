@@ -1,9 +1,70 @@
 ---
-// Вид `requisites`: реквизиты и оператор ПДн из `site.yaml` (ep05). Скелет до T03: вывода пока
-// нет, есть только пункт в карте `VIEWS` — без него `Record<BlockView, …>` не соберётся.
-import type { Block } from '../../lib/content';
+// Вид `requisites`: реквизиты и оператор ПДн из `site.yaml` (ep05) — список определений: подпись
+// из `site.legalLabels`, значение из `site.legal` как есть (`data-voice="raw"`: коды — не числа
+// с разрядами, V4). Название юрлица — строкой над списком, у него подписи нет. При пустом
+// `site.legal` вид ничего не выводит: у секции остаётся заголовок. В production вид видим только
+// при заведённом юрлице (правило целостности 12).
+import { visibleLegal } from '../../lib/content-core';
+import { getSite, type Block } from '../../lib/content';
 
 interface Props {
   block: Block;
 }
+
+const items = visibleLegal(await getSite(), { operator: true });
+const name = items.find((item) => item.key === 'entityName');
+const rows = items.filter((item) => item.key !== 'entityName');
 ---
+
+{
+  name && (
+    <p class="requisites__name" data-voice="raw">
+      {name.value}
+    </p>
+  )
+}
+{
+  rows.length > 0 && (
+    <dl class="requisites">
+      {rows.map((item) => (
+        <div class="requisites__row">
+          <dt class="requisites__label">{item.label}</dt>
+          <dd class="requisites__value" data-voice="raw">
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+<style>
+  .requisites__name {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .requisites {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--term-min), 100%), 1fr));
+    gap: var(--space-xs) var(--space-lg);
+    margin: 0;
+  }
+
+  .requisites__row {
+    display: grid;
+    gap: var(--space-2xs);
+    min-width: 0;
+    padding-block: var(--space-xs);
+    border-block-end: var(--border-width) solid var(--color-border);
+  }
+
+  .requisites__label {
+    color: var(--color-text-muted);
+    font-size: var(--text-small);
+  }
+
+  .requisites__value {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+</style>

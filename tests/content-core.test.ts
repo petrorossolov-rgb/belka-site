@@ -902,10 +902,34 @@ describe('функции подвала', () => {
     ]);
   });
 
-  it('частично заполненные реквизиты — только заполненные, с подписями', () => {
-    expect(visibleLegal({ legal: { entityName: 'ООО «Пример»', inn: '7700000000' } })).toEqual([
-      { key: 'entityName', text: 'ООО «Пример»' },
-      { key: 'inn', text: 'ИНН 7700000000' },
+  it('частично заполненные реквизиты — только заполненные, подпись из legalLabels (ep05)', () => {
+    const legalLabels = { inn: 'Подпись ИНН', ogrn: 'Подпись ОГРН' };
+    expect(visibleLegal({ legal: { entityName: 'ООО «Пример»', inn: '7700000000' }, legalLabels })).toEqual([
+      { key: 'entityName', value: 'ООО «Пример»' },
+      { key: 'inn', label: 'Подпись ИНН', value: '7700000000' },
+    ]);
+  });
+
+  it('порядок полей — название, ИНН, ОГРН, адрес; оператор — только по запросу (ep05)', () => {
+    const site = {
+      legal: { piiOperator: 'ООО «Оператор»', address: 'Адрес', ogrn: '1027700000000', inn: '7700000000', entityName: 'ООО «Пример»' },
+      legalLabels: { inn: 'и', ogrn: 'о', address: 'а', operator: 'п' },
+    };
+    expect(visibleLegal(site).map((item) => item.key)).toEqual(['entityName', 'inn', 'ogrn', 'address']);
+    expect(visibleLegal(site, { operator: true }).map((item) => item.key)).toEqual([
+      'entityName',
+      'inn',
+      'ogrn',
+      'address',
+      'operator',
+    ]);
+    expect(visibleLegal(site, { operator: true }).at(-1)).toEqual({ key: 'operator', label: 'п', value: 'ООО «Оператор»' });
+  });
+
+  it('без подписи в legalLabels значение выводится без подписи; пробельная подпись — пустая (ep05)', () => {
+    expect(visibleLegal({ legal: { inn: '7700000000' } })).toEqual([{ key: 'inn', value: '7700000000' }]);
+    expect(visibleLegal({ legal: { inn: '7700000000' }, legalLabels: { inn: '  ' } })).toEqual([
+      { key: 'inn', value: '7700000000' },
     ]);
   });
 
@@ -914,8 +938,9 @@ describe('функции подвала', () => {
       { key: 'telegram', href: 'https://t.me/example', text: 't.me/example' },
     ]);
     expect(visibleLegal({ legal: { entityName: '', inn: ' ', ogrn: '1027700000000', address: '' } })).toEqual([
-      { key: 'ogrn', text: 'ОГРН 1027700000000' },
+      { key: 'ogrn', value: '1027700000000' },
     ]);
+    expect(visibleLegal({ legal: { piiOperator: ' ' }, legalLabels: { operator: 'п' } }, { operator: true })).toEqual([]);
   });
 });
 
