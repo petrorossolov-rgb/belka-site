@@ -69,6 +69,15 @@ jobs:
       - name: Зависимости
         run: npm ci
 
+      # Режим Метрики для check-dist-seo — из источника правды (src/content/site.yaml), а не из
+      # сборки (ep05). site-flags.mjs импортирует yaml, поэтому шаг идёт после npm ci. Неудача
+      # чтения роняет шаг: присваивание с упавшей подстановкой завершает bash -e.
+      - name: Режим Метрики из site.yaml
+        run: |
+          metrika="$(node scripts/lib/site-flags.mjs metrikaEnabled)"
+          echo "METRIKA=$metrika" >> "$GITHUB_ENV"
+          echo "Метрика: $metrika"
+
       - name: Типы (astro check)
         run: npm run check
 
@@ -100,7 +109,7 @@ jobs:
         run: npm run build
 
       - name: check-dist-seo production
-        run: node scripts/check-dist-seo.mjs production --dist dist --out draft-routes.json
+        run: node scripts/check-dist-seo.mjs production --metrika "$METRIKA" --dist dist --out draft-routes.json
 
       - name: check-voice production
         run: node scripts/check-voice.mjs --dist dist --env production
@@ -143,7 +152,7 @@ jobs:
 
       - name: check-dist-seo staging
         if: inputs.site_env == 'staging'
-        run: node scripts/check-dist-seo.mjs staging --dist dist-staging --out draft-routes.json
+        run: node scripts/check-dist-seo.mjs staging --metrika "$METRIKA" --dist dist-staging --out draft-routes.json
 
       - name: check-voice staging
         if: inputs.site_env == 'staging'
