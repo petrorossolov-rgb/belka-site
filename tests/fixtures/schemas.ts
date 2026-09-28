@@ -47,6 +47,23 @@ export const validSite = {
   seo: {},
 };
 
+/** Строки плашки согласия (ep05); подписи — вымышленные, только для тестов. */
+export const validConsent = {
+  title: 'Заголовок плашки',
+  text: 'Текст плашки.',
+  allow: 'Разрешить',
+  deny: 'Отказаться',
+  settings: 'Настройки',
+  policyLink: 'Политика',
+  consentLink: 'Согласие',
+  policyPage: 'privacy',
+  consentPage: 'consent',
+  version: 1,
+};
+
+/** Подписи реквизитов (ep05). */
+export const validLegalLabels = { inn: 'ИНН', ogrn: 'ОГРН', address: 'Адрес', operator: 'Оператор' };
+
 /** Полный набор: юрлицо заведено, Метрика включена. Данные вымышленные, только для тестов. */
 export const validSiteWithMetrika = {
   ...validSite,
@@ -55,6 +72,8 @@ export const validSiteWithMetrika = {
   flags: { legalEntityReady: true, metrikaEnabled: true, showReadiness: false },
   metrika: { counterId: '12345678' },
   seo: { defaultOgImage: './og-default.png', defaultOgImageAlt: 'Карточка сайта' },
+  consent: validConsent,
+  legalLabels: validLegalLabels,
 };
 
 /** Секция со всеми полями; `link.page` — id страницы (в тестах `reference()` — строка). */
