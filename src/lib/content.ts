@@ -44,7 +44,7 @@ function ensureIntegrity(): Promise<void> {
     getCollection('mockups'),
     readSite(),
   ]).then(([products, pages, cases, blocks, mockups, site]) =>
-    core.assertContentIntegrity({ products, pages, cases, blocks, mockups, site }),
+    core.assertContentIntegrity({ products, pages, cases, blocks, mockups, site, env: SITE_ENV }),
   );
   return integrity;
 }
