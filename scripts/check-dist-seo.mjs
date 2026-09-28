@@ -1,15 +1,23 @@
 // @ts-check
 // Проверка собранного dist/ (T16): индексация по окружению и общие инварианты сборки.
 //
-//   node scripts/check-dist-seo.mjs <production|staging> [--dist dist] [--out draft-routes.json]
+//   node scripts/check-dist-seo.mjs <production|staging> --metrika <on|off> [--dist dist] [--out draft-routes.json]
 //
 // production — есть sitemap без 404 и черновиков, robots разрешает индексацию, нет noindex,
 //              data-draft и черновых блоков (data-draft-block).
 // staging    — нет sitemap, robots `Disallow: /`, noindex на каждой HTML-странице.
 // Оба        — ресурсы только со своего хоста (Constitution 4), preload шрифтов только у основной
-//              гарнитуры (--font-sans), никаких <script>, кроме JSON-LD; og:image, если есть, —
-//              PNG из этой сборки с размерами как в og:image:width|height, не больше 300 КБ,
-//              с непустым og:image:alt.
+//              гарнитуры (--font-sans), никаких <script>, кроме JSON-LD (и скрипта согласия в
+//              режиме «вкл.»); og:image, если есть, — PNG из этой сборки с размерами как в
+//              og:image:width|height, не больше 300 КБ, с непустым og:image:alt.
+// --metrika  — режим Метрики (ep05) из источника правды, а не из сборки: в gates.yml его даёт
+//              `node scripts/lib/site-flags.mjs metrikaEnabled` по src/content/site.yaml.
+//              Обязателен, значения по умолчанию нет.
+//   off      — прежние правила плюс: нет файла js/consent.js и нет разметки плашки (элемента с
+//              атрибутом data-consent) ни на одной странице (Constitution 4: без флага нет JS).
+//   on       — на каждой HTML-странице ровно один <script src="/js/consent.js" defer> без тела и
+//              без других атрибутов; файл js/consent.js есть; <noscript> запрещён (пиксель
+//              Метрики без согласия); любой другой <script>, кроме JSON-LD, запрещён, как раньше.
 // Пишет draft-routes.json — маршруты страниц с data-draft (для смоука T17, в dist/ не попадает).
 // Код 1 — нарушения, код 2 — ошибка вызова.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -18,6 +26,13 @@ import { fileURLToPath } from 'node:url';
 
 export const PRODUCTION_ORIGIN = 'https://belkascm.ru';
 const ENVS = ['production', 'staging'];
+
+/** Режимы Метрики (`--metrika`): флаг `site.flags.metrikaEnabled` в site.yaml. */
+export const METRIKA_MODES = ['on', 'off'];
+
+/** Скрипт согласия (ep05): единственный клиентский JS сайта, только при включённой Метрике. */
+export const CONSENT_SCRIPT = '/js/consent.js';
+const CONSENT_FILE = CONSENT_SCRIPT.slice(1);
 
 /** Предел веса картинки превью: карточку с картинкой тяжелее 300 КБ WhatsApp не показывает. */
 export const OG_IMAGE_MAX_BYTES = 300 * 1024;
@@ -142,13 +157,18 @@ function distFileOf(/** @type {string} */ pathname) {
 }
 
 /**
- * Проверяет собранный dist.
- * @param {{ distDir: string, env: string }} options
+ * Проверяет собранный dist. `metrika` обязателен: нет его или значение вне `on|off` —
+ * исключение (в типе поле необязательно, чтобы вызов без режима падал здесь, а не молча).
+ * @param {{ distDir: string, env: string, metrika?: string }} options
  * @returns {CheckResult}
  */
-export function checkDistSeo({ distDir, env }) {
+export function checkDistSeo({ distDir, env, metrika }) {
   if (!ENVS.includes(env)) throw new Error(`окружение «${env}»: допустимо ${ENVS.join(', ')}`);
+  if (metrika === undefined || !METRIKA_MODES.includes(metrika)) {
+    throw new Error(`режим Метрики «${metrika}»: допустимо ${METRIKA_MODES.join(', ')}`);
+  }
   if (!existsSync(distDir)) throw new Error(`нет каталога сборки ${distDir}`);
+  const metrikaOn = metrika === 'on';
 
   /** @type {string[]} */
   const errors = [];
@@ -181,8 +201,15 @@ export function checkDistSeo({ distDir, env }) {
     }
     if (!production && !noindex) errors.push(`${file}: нет <meta name="robots" content="noindex, nofollow">`);
 
-    errors.push(...checkPageInvariants(file, html));
+    errors.push(...checkConsentMarkup(file, html, metrikaOn));
+    errors.push(...checkPageInvariants(file, html, metrikaOn));
     errors.push(...checkOgImage(file, html, distDir));
+  }
+
+  if (metrikaOn && !files.includes(CONSENT_FILE)) {
+    errors.push(`${CONSENT_FILE}: нет файла скрипта согласия, а Метрика включена`);
+  } else if (!metrikaOn && files.includes(CONSENT_FILE)) {
+    errors.push(`${CONSENT_FILE}: скрипт согласия в сборке, а Метрика выключена (site.flags.metrikaEnabled)`);
   }
 
   for (const file of files.filter((f) => f.endsWith('.css'))) {
@@ -203,8 +230,48 @@ export function checkDistSeo({ distDir, env }) {
   return { errors, draftRoutes };
 }
 
-/** Инварианты любой страницы: свои ресурсы, preload только основной гарнитуры, без скриптов. */
-function checkPageInvariants(/** @type {string} */ file, /** @type {string} */ html) {
+/**
+ * Разметка согласия на странице (ep05). «Выкл.»: ни одного элемента с `data-consent`. «Вкл.»:
+ * ровно один `<script src="/js/consent.js" defer>` — только эти два атрибута, без тела; без
+ * `<noscript>`. Прочие скрипты проверяет `checkPageInvariants`, как раньше.
+ */
+function checkConsentMarkup(/** @type {string} */ file, /** @type {string} */ html, /** @type {boolean} */ metrikaOn) {
+  /** @type {string[]} */
+  const errors = [];
+  if (!metrikaOn) {
+    for (const tag of tagsWithAttr(html, 'data-consent')) {
+      errors.push(`${file}: разметка плашки согласия <${tag.name} data-consent> в сборке, а Метрика выключена (маршрут ${routeOf(file)})`);
+    }
+    return errors;
+  }
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
+    .map((m) => ({ attrs: parseAttrs(m[1] ?? ''), body: m[2] ?? '' }))
+    .filter(({ attrs }) => attrs.get('src') === CONSENT_SCRIPT);
+  if (scripts.length === 0) {
+    errors.push(`${file}: нет <script src="${CONSENT_SCRIPT}" defer> — Метрика включена`);
+  } else if (scripts.length > 1) {
+    errors.push(`${file}: <script src="${CONSENT_SCRIPT}"> подключён ${scripts.length} раза — нужен ровно один`);
+  }
+  for (const { attrs, body } of scripts) {
+    if (body.trim() !== '') {
+      errors.push(`${file}: у <script src="${CONSENT_SCRIPT}"> есть тело — скрипт подключается только файлом`);
+    }
+    const names = [...attrs.keys()].sort();
+    if (names.join(' ') !== 'defer src') {
+      errors.push(`${file}: <script src="${CONSENT_SCRIPT}"> с атрибутами «${names.join(', ')}» — нужны ровно src и defer`);
+    }
+  }
+  if (parseTags(html, ['noscript']).length > 0) {
+    errors.push(`${file}: <noscript> запрещён — Метрика без JS грузилась бы без согласия`);
+  }
+  return errors;
+}
+
+/**
+ * Инварианты любой страницы: свои ресурсы, preload только основной гарнитуры, без скриптов.
+ * В режиме Метрики «вкл.» `<script src="/js/consent.js">` проверяет `checkConsentMarkup`.
+ */
+function checkPageInvariants(/** @type {string} */ file, /** @type {string} */ html, /** @type {boolean} */ metrikaOn) {
   /** @type {string[]} */
   const errors = [];
   const external = (/** @type {string} */ what, /** @type {string} */ url) => {
@@ -226,6 +293,7 @@ function checkPageInvariants(/** @type {string} */ file, /** @type {string} */ h
         }
       }
     } else if (name === 'script') {
+      if (metrikaOn && attrs.get('src') === CONSENT_SCRIPT) continue;
       if ((attrs.get('type') ?? '').toLowerCase() !== 'application/ld+json') {
         errors.push(`${file}: <script${attrs.has('src') ? ` src="${attrs.get('src')}"` : ''}> — клиентский JS запрещён`);
       } else if (attrs.has('src')) {
@@ -380,20 +448,29 @@ function localFile(/** @type {string} */ loc, /** @type {string[]} */ errors, /*
 
 function main(/** @type {string[]} */ argv) {
   const [env, ...rest] = argv;
+  const usage =
+    'использование: node scripts/check-dist-seo.mjs <production|staging> --metrika <on|off> [--dist dist] [--out draft-routes.json]';
   let distDir = 'dist';
   let out = 'draft-routes.json';
+  /** @type {string | undefined} */
+  let metrika;
   for (let i = 0; i < rest.length; i += 2) {
     const [flag, value] = [rest[i], rest[i + 1]];
-    if (value === undefined || (flag !== '--dist' && flag !== '--out')) {
-      console.error('использование: node scripts/check-dist-seo.mjs <production|staging> [--dist dist] [--out draft-routes.json]');
+    if (value === undefined || (flag !== '--dist' && flag !== '--out' && flag !== '--metrika')) {
+      console.error(usage);
       return 2;
     }
     if (flag === '--dist') distDir = value;
-    else out = value;
+    else if (flag === '--out') out = value;
+    else metrika = value;
+  }
+  if (metrika === undefined) {
+    console.error(`check-dist-seo: не задан --metrika (режим из site.yaml: node scripts/lib/site-flags.mjs metrikaEnabled)\n${usage}`);
+    return 2;
   }
   let result;
   try {
-    result = checkDistSeo({ distDir: resolve(distDir), env: env ?? '' });
+    result = checkDistSeo({ distDir: resolve(distDir), env: env ?? '', metrika });
   } catch (error) {
     console.error(`check-dist-seo: ${error instanceof Error ? error.message : String(error)}`);
     return 2;
@@ -404,7 +481,7 @@ function main(/** @type {string[]} */ argv) {
     for (const error of result.errors) console.error(`  - ${error}`);
     return 1;
   }
-  console.log(`check-dist-seo ${env}: OK; черновые маршруты: ${JSON.stringify(result.draftRoutes)} → ${out}`);
+  console.log(`check-dist-seo ${env} --metrika ${metrika}: OK; черновые маршруты: ${JSON.stringify(result.draftRoutes)} → ${out}`);
   return 0;
 }
 

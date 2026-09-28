@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +17,7 @@ afterEach(() => {
   for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-function fixture(env: 'production' | 'staging'): string {
+function fixture(env: 'production' | 'staging' | 'metrika'): string {
   const dir = mkdtempSync(join(tmpdir(), `dist-${env}-`));
   temps.push(dir);
   cpSync(join(FIXTURES, `dist-${env}`), dir, { recursive: true });
@@ -31,8 +31,10 @@ function edit(dir: string, file: string, change: (text: string) => string): void
 
 const addToHead = (tag: string) => (html: string) => html.replace('</head>', `${tag}</head>`);
 
-function check(dir: string, env: 'production' | 'staging') {
-  return checkDistSeo({ distDir: dir, env });
+// Режим Метрики (ep05) у функции обязателен; помощник теста передаёт «выкл.» по умолчанию —
+// прежние пробы проверяют сборку сайта без Метрики, как и раньше.
+function check(dir: string, env: 'production' | 'staging', metrika: 'on' | 'off' = 'off') {
+  return checkDistSeo({ distDir: dir, env, metrika });
 }
 
 describe('check-dist-seo: production', () => {
@@ -399,8 +401,10 @@ describe('check-dist-seo: граничные случаи', () => {
 });
 
 describe('check-dist-seo: запуск из командной строки', () => {
+  // `--metrika` обязателен (ep05); помощник добавляет «off», если вызов его не задал.
   function run(args: string[]) {
-    return spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
+    const mode = args.includes('--metrika') ? [] : ['--metrika', 'off'];
+    return spawnSync(process.execPath, [SCRIPT, ...args, ...mode], { encoding: 'utf8' });
   }
 
   it('staging: код 0 и draft-routes.json с черновыми маршрутами', () => {
@@ -425,5 +429,161 @@ describe('check-dist-seo: запуск из командной строки', ()
   it('неверный вызов → код 2', () => {
     expect(run(['prod']).status).toBe(2);
     expect(run(['staging', '--dist']).status).toBe(2);
+  });
+});
+
+// ep05: режим Метрики. Режим берётся из site.yaml (site-flags), а не из сборки. «Выкл.» — прежние
+// правила плюс два новых; «вкл.» — ровно один <script src="/js/consent.js" defer> без тела на
+// каждой странице, файл скрипта в сборке, без <noscript>. Каждая проба ждёт сообщение НОВОГО
+// правила. Фикстура «вкл.» — tests/fixtures/dist-metrika/ (staging-сборка пробы с плашкой).
+describe('check-dist-seo: режим Метрики «выкл.» (ep05)', () => {
+  it('файл js/consent.js в сборке → ошибка', () => {
+    const dir = fixture('production');
+    mkdirSync(join(dir, 'js'));
+    writeFileSync(join(dir, 'js', 'consent.js'), '(function () {})();\n');
+    expect(check(dir, 'production').errors).toEqual([
+      'js/consent.js: скрипт согласия в сборке, а Метрика выключена (site.flags.metrikaEnabled)',
+    ]);
+  });
+
+  it('разметка плашки <aside hidden data-consent> → ошибка с маршрутом', () => {
+    const dir = fixture('production');
+    edit(dir, 'index.html', (html) => html.replace('</body>', '<aside hidden data-consent><p>Плашка</p></aside></body>'));
+    expect(check(dir, 'production').errors).toEqual([
+      'index.html: разметка плашки согласия <aside data-consent> в сборке, а Метрика выключена (маршрут /)',
+    ]);
+  });
+
+  it('data-consent на любом элементе и в staging тоже ловится; похожий атрибут — нет', () => {
+    const dir = fixture('staging');
+    edit(dir, 'index.html', (html) => html.replace('</body>', '<div data-consent="x"></div><div data-consented></div></body>'));
+    expect(check(dir, 'staging').errors).toEqual([
+      'index.html: разметка плашки согласия <div data-consent> в сборке, а Метрика выключена (маршрут /)',
+    ]);
+  });
+
+  it('положительная пара: текущая dist-production проходит в «выкл.» и падает в «вкл.»', () => {
+    expect(check(fixture('production'), 'production', 'off').errors).toEqual([]);
+    expect(check(fixture('production'), 'production', 'on').errors).toContain(
+      'index.html: нет <script src="/js/consent.js" defer> — Метрика включена',
+    );
+  });
+
+  it('фикстура «вкл.» в режиме «выкл.» → новые правила и прежний запрет скрипта', () => {
+    const errors = check(fixture('metrika'), 'staging', 'off').errors;
+    expect(errors).toContain('js/consent.js: скрипт согласия в сборке, а Метрика выключена (site.flags.metrikaEnabled)');
+    expect(errors).toContain('index.html: <script src="/js/consent.js"> — клиентский JS запрещён');
+  });
+});
+
+describe('check-dist-seo: режим Метрики «вкл.» (ep05)', () => {
+  const tag = '<script src="/js/consent.js" defer></script>';
+  const mutate = (change: (html: string) => string) => {
+    const dir = fixture('metrika');
+    edit(dir, 'index.html', change);
+    return check(dir, 'staging', 'on').errors;
+  };
+
+  it('чистая фикстура dist-metrika проходит; черновые маршруты — как у staging', () => {
+    expect(check(fixture('metrika'), 'staging', 'on')).toEqual({ errors: [], draftRoutes: ['/products/wms/'] });
+  });
+
+  it('страница без скрипта → ошибка', () => {
+    expect(mutate((html) => html.replace(tag, ''))).toEqual([
+      'index.html: нет <script src="/js/consent.js" defer> — Метрика включена',
+    ]);
+  });
+
+  it('скрипт согласия с телом → ошибка', () => {
+    expect(mutate((html) => html.replace(tag, '<script src="/js/consent.js" defer>ym(1, "init")</script>'))).toEqual([
+      'index.html: у <script src="/js/consent.js"> есть тело — скрипт подключается только файлом',
+    ]);
+  });
+
+  it('два скрипта согласия → ошибка', () => {
+    expect(mutate((html) => html.replace(tag, tag + tag))).toEqual([
+      'index.html: <script src="/js/consent.js"> подключён 2 раза — нужен ровно один',
+    ]);
+  });
+
+  it('src="/js/other.js" вместо скрипта согласия → нет скрипта согласия и прежний запрет', () => {
+    expect(mutate((html) => html.replace(tag, '<script src="/js/other.js" defer></script>'))).toEqual([
+      'index.html: нет <script src="/js/consent.js" defer> — Метрика включена',
+      'index.html: <script src="/js/other.js"> — клиентский JS запрещён',
+    ]);
+  });
+
+  it('внешний src вместо скрипта согласия → нет скрипта согласия и прежние запреты', () => {
+    const errors = mutate((html) => html.replace(tag, '<script src="https://mc.yandex.ru/metrika/tag.js" defer></script>'));
+    expect(errors[0]).toBe('index.html: нет <script src="/js/consent.js" defer> — Метрика включена');
+    expect(errors).toContain('index.html: <script src="https://mc.yandex.ru/metrika/tag.js"> — клиентский JS запрещён');
+  });
+
+  it('инлайн-скрипт рядом со скриптом согласия → прежний запрет', () => {
+    expect(mutate((html) => html.replace(tag, `${tag}<script>ym(1, "init")</script>`))).toEqual([
+      'index.html: <script> — клиентский JS запрещён',
+    ]);
+  });
+
+  it.each([
+    ['type="module"', '<script type="module" src="/js/consent.js" defer></script>', 'defer, src, type'],
+    ['без defer', '<script src="/js/consent.js"></script>', 'src'],
+    ['async вместо defer', '<script src="/js/consent.js" async></script>', 'async, src'],
+    ['лишний атрибут', '<script src="/js/consent.js" defer data-counter="1"></script>', 'data-counter, defer, src'],
+  ])('%s → ошибка формы тега', (_name, replacement, attrs) => {
+    expect(mutate((html) => html.replace(tag, replacement))).toEqual([
+      `index.html: <script src="/js/consent.js"> с атрибутами «${attrs}» — нужны ровно src и defer`,
+    ]);
+  });
+
+  it('<noscript> с пикселем → ошибка', () => {
+    const pixel = '<noscript><div><img src="/pixel.gif" alt=""></div></noscript>';
+    expect(mutate((html) => html.replace('</body>', `${pixel}</body>`))).toEqual([
+      'index.html: <noscript> запрещён — Метрика без JS грузилась бы без согласия',
+    ]);
+  });
+
+  it('нет файла js/consent.js → ошибка', () => {
+    const dir = fixture('metrika');
+    rmSync(join(dir, 'js', 'consent.js'));
+    expect(check(dir, 'staging', 'on').errors).toEqual(['js/consent.js: нет файла скрипта согласия, а Метрика включена']);
+  });
+
+  it('JSON-LD рядом со скриптом согласия проходит', () => {
+    const jsonLd = '<script type="application/ld+json">{"@type":"Organization"}</script>';
+    expect(mutate((html) => html.replace(tag, `${tag}${jsonLd}`))).toEqual([]);
+  });
+
+  it('неизвестный режим или его нет → исключение', () => {
+    const dir = fixture('metrika');
+    expect(() => checkDistSeo({ distDir: dir, env: 'staging', metrika: 'maybe' })).toThrow(/режим Метрики «maybe»/);
+    expect(() => checkDistSeo({ distDir: dir, env: 'staging' })).toThrow(/режим Метрики «undefined»/);
+  });
+});
+
+describe('check-dist-seo: --metrika в командной строке (ep05)', () => {
+  const cli = (args: string[]) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
+  const outFor = (dir: string) => {
+    const out = join(dir, '..', `${dir.split(/[\\/]/).pop()}-draft-routes.json`);
+    temps.push(out);
+    return out;
+  };
+
+  it('без --metrika → код 2', () => {
+    const dir = fixture('staging');
+    const result = cli(['staging', '--dist', dir, '--out', outFor(dir)]);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('--metrika');
+  });
+
+  it('--metrika maybe → код 2', () => {
+    const dir = fixture('staging');
+    expect(cli(['staging', '--dist', dir, '--out', outFor(dir), '--metrika', 'maybe']).status).toBe(2);
+  });
+
+  it('--metrika on по чистой фикстуре → код 0', () => {
+    const dir = fixture('metrika');
+    const result = cli(['staging', '--dist', dir, '--out', outFor(dir), '--metrika', 'on']);
+    expect([result.status, result.stderr]).toEqual([0, '']);
   });
 });
