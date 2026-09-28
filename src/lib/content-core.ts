@@ -2,7 +2,7 @@
 // Без импорта `astro:*` — работает на любых объектах вида `{ id, data, body? }`,
 // поэтому тесты не поднимают Astro. Доступ к коллекциям — только `src/lib/content.ts`.
 
-import { LIMITS, SCENARIO_KINDS, type BlockView, type MockupKind } from './schemas';
+import { LIMITS, SCENARIO_KINDS, type BlockView, type MetrikaState, type MockupKind } from './schemas';
 import { productTitle } from './seo';
 import type { SiteEnv } from './site-env';
 
@@ -17,6 +17,9 @@ export const RESERVED_PAGE_IDS: readonly string[] = ['index', '404'];
 
 /** Страницы с этим префиксом id столкнулись бы с маршрутами `products/[id].astro`. */
 const PRODUCT_ROUTE_PREFIX = 'products/';
+
+/** Страницы с этим префиксом id столкнулись бы с эндпоинтом скрипта `js/[file].js.ts` (ep05). */
+const SCRIPT_ROUTE_PREFIX = 'js/';
 
 export type NavPlacement = 'header' | 'footer';
 
@@ -67,6 +70,7 @@ export type PageLike = EntryLike<{
   nav?: { label?: string | undefined; order: number; placement: NavPlacement } | undefined;
   sections?: readonly RefLike[] | undefined;
   ogImage?: ImageMetaLike | undefined;
+  metrikaState?: MetrikaState | undefined;
   draft: boolean;
 }>;
 
@@ -74,6 +78,7 @@ export type BlockLike = EntryLike<{
   view: BlockView;
   items?: readonly { mockup?: RefLike | undefined; product?: RefLike | undefined }[] | undefined;
   link?: { page: RefLike; label: string } | undefined;
+  metrikaState?: MetrikaState | undefined;
   draft: boolean;
 }>;
 
@@ -213,6 +218,7 @@ export interface FooterSiteLike {
         inn?: string | undefined;
         ogrn?: string | undefined;
         address?: string | undefined;
+        piiOperator?: string | undefined;
       }
     | undefined;
 }
@@ -269,6 +275,17 @@ export interface IntegritySiteLike extends FooterSiteLike {
   mockupNote?: string | undefined;
   mockupPauseLabel?: string | undefined;
   seo?: { defaultOgImage?: ImageMetaLike | undefined } | undefined;
+  /** Флаги `site.yaml`; без группы оба считаются выключенными. */
+  flags?: { legalEntityReady: boolean; metrikaEnabled: boolean } | undefined;
+  consent?: { policyPage: string; consentPage: string } | undefined;
+  legalLabels?:
+    | {
+        inn?: string | undefined;
+        ogrn?: string | undefined;
+        address?: string | undefined;
+        operator?: string | undefined;
+      }
+    | undefined;
 }
 
 /**
@@ -282,6 +299,7 @@ export function assertContentIntegrity({
   blocks,
   mockups,
   site,
+  env,
 }: {
   products: readonly ProductLike[];
   pages: readonly PageLike[];
@@ -289,6 +307,8 @@ export function assertContentIntegrity({
   blocks: readonly BlockLike[];
   mockups: readonly MockupLike[];
   site: IntegritySiteLike;
+  /** Окружение сборки: правила 10 и 12 действуют только в production, правило 11 — в любом. */
+  env: SiteEnv;
 }): void {
   const errors: string[] = [];
 
@@ -473,6 +493,9 @@ export function assertContentIntegrity({
     if (page.id.startsWith(PRODUCT_ROUTE_PREFIX)) {
       errors.push(`${source(page)}: id «${page.id}» занимает маршрут страниц продуктов /products/…`);
     }
+    if (page.id.startsWith(SCRIPT_ROUTE_PREFIX)) {
+      errors.push(`${source(page)}: id «${page.id}» занимает маршрут скрипта согласия /js/…`);
+    }
   }
   const notFound = pages.find((p) => p.id === '404');
   if (notFound !== undefined) {
@@ -485,6 +508,85 @@ export function assertContentIntegrity({
   const contacts = pages.find((p) => p.id === 'contacts');
   if (contacts !== undefined && !contacts.data.draft && visibleContacts(site).length === 0) {
     errors.push(`${source(contacts)}: страница контактов видима, но в site.contacts нет ни одного канала`);
+  }
+
+  // Метрика и согласие (ep05). Видимость — теми же `filterVisible` и `getProductPages`, что и
+  // рендер; отсутствующий блок уже записан в ошибки выше, здесь он пропускается.
+  const metrikaEnabled = site.flags?.metrikaEnabled === true;
+  const productionPages = filterVisible(pages, 'production');
+  const productionOwners = [...productionPages, ...getProductPages(products, 'production')].map((owner) => ({
+    owner,
+    shown: filterVisible(
+      (owner.data.sections ?? []).flatMap((ref) => blocksById.get(ref.id) ?? []),
+      'production',
+    ),
+  }));
+
+  // Правило 10: в production-сборке видимая страница и блоки её секций верны при текущем флаге.
+  if (env === 'production') {
+    const flagState: MetrikaState = metrikaEnabled ? 'on' : 'off';
+    const checkState = (entry: PageLike | BlockLike, what: string) => {
+      const state = entry.data.metrikaState;
+      if (state !== undefined && state !== flagState) {
+        errors.push(
+          `${source(entry)}: ${what} с metrikaState: ${state} видим в production, а флаг Метрики — ${flagState} ` +
+            `(site.flags.metrikaEnabled: ${metrikaEnabled})`,
+        );
+      }
+    };
+    productionPages.forEach((page) => checkState(page, 'страница'));
+    const checked = new Set<string>();
+    for (const { owner, shown } of productionOwners) {
+      for (const entry of shown) {
+        if (checked.has(entry.id)) continue;
+        checked.add(entry.id);
+        checkState(entry, `блок в секциях ${source(owner)}`);
+      }
+    }
+  }
+
+  // Правило 11: при Метрике плашка ведёт на политику и согласие, видимые в этом окружении.
+  if (metrikaEnabled) {
+    if (site.consent === undefined) {
+      errors.push('src/content/site.yaml: Метрика включена, но не задан consent');
+    } else {
+      const visiblePageIds = new Set(filterVisible(pages, env).map((p) => p.id));
+      for (const field of ['policyPage', 'consentPage'] as const) {
+        const id = site.consent[field];
+        if (!pageIds.has(id)) {
+          errors.push(`src/content/site.yaml: consent.${field} — страницы «${id}» нет в src/content/pages`);
+        } else if (!visiblePageIds.has(id)) {
+          errors.push(`src/content/site.yaml: consent.${field} — страница «${id}» не видима в окружении ${env}`);
+        }
+      }
+    }
+  }
+
+  // Правило 12: реквизиты, видимые в production, — только при заведённом юрлице.
+  if (env === 'production' && site.flags?.legalEntityReady !== true) {
+    for (const { owner, shown } of productionOwners) {
+      for (const entry of shown) {
+        if (entry.data.view !== 'requisites') continue;
+        errors.push(
+          `${source(entry)}: view: requisites видим в production (${source(owner)}), а юрлицо не заведено ` +
+            '(site.flags.legalEntityReady)',
+        );
+      }
+    }
+  }
+
+  // Подписи реквизитов — из контента (Constitution 5): у заполненного значения есть подпись.
+  // `site.legal` читается напрямую: подпись нужна любому выводу значения, не только подвалу.
+  const labelFields = [
+    ['inn', 'inn'],
+    ['ogrn', 'ogrn'],
+    ['address', 'address'],
+    ['piiOperator', 'operator'],
+  ] as const;
+  for (const [legalField, labelField] of labelFields) {
+    if (filled(site.legal?.[legalField]) !== undefined && filled(site.legalLabels?.[labelField]) === undefined) {
+      errors.push(`src/content/site.yaml: задан legal.${legalField}, но нет подписи legalLabels.${labelField}`);
+    }
   }
 
   if (errors.length > 0) {

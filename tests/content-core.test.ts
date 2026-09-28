@@ -161,6 +161,7 @@ describe('assertContentIntegrity', () => {
     blocks: [wmsScope],
     mockups: [],
     site: {},
+    env: 'production' as const,
   };
 
   it('принимает набор ep01 и вложенный id страницы', () => {
@@ -168,7 +169,7 @@ describe('assertContentIntegrity', () => {
   });
 
   it('пустые коллекции — без исключений', () => {
-    expect(() => assertContentIntegrity({ products: [], pages: [], cases: [], blocks: [], mockups: [], site: {} })).not.toThrow();
+    expect(() => assertContentIntegrity({ products: [], pages: [], cases: [], blocks: [], mockups: [], site: {}, env: 'production' })).not.toThrow();
   });
 
   it('дубль mapOrder — исключение с именами обоих файлов', () => {
@@ -351,6 +352,7 @@ describe('assertContentIntegrity: секции, маршруты, контакт
     blocks: [theses, team],
     mockups: [],
     site: {},
+    env: 'production' as const,
   };
   // Секция страницы WMS из набора ep01 (`pageProduct`) есть при любой подмене блоков.
   const check = (patch: Partial<Parameters<typeof assertContentIntegrity>[0]>) => () =>
@@ -467,6 +469,7 @@ describe('assertContentIntegrity: страница продукта, мокап�
     blocks: [wmsScope, wmsSurfaces],
     mockups: [mockup('wms-console')],
     site: { mockupNote: 'Демо-данные.' },
+    env: 'production' as const,
   };
   const check = (patch: Partial<Parameters<typeof assertContentIntegrity>[0]>) => () =>
     assertContentIntegrity({ ...base, ...patch });
@@ -694,6 +697,171 @@ describe('assertContentIntegrity: страница продукта, мокап�
       expect(check({ blocks: allDraft, products: [{ ...wms, data: { ...wms.data, draft: true } }] })).not.toThrow();
       expect(check({ blocks: [wmsScope, allDraft[1]!] })).not.toThrow();
     });
+  });
+});
+
+describe('assertContentIntegrity: Метрика, согласие, реквизиты (ep05)', () => {
+  const now = block('privacy-now', { view: 'text', metrikaState: 'off' }, 'Текст.');
+  const policy = block('privacy-policy', { view: 'text', metrikaState: 'on', draft: true }, 'Текст.');
+  const requisites = block('privacy-requisites', { view: 'requisites', metrikaState: 'on', draft: true });
+  const privacy = page('privacy', { sections: refs('privacy-now', 'privacy-policy', 'privacy-requisites') });
+  const consent = page('consent', { metrikaState: 'on', draft: true });
+  const flagsOff = { legalEntityReady: false, metrikaEnabled: false };
+  const flagsOn = { legalEntityReady: true, metrikaEnabled: true };
+  const consentLinks = { policyPage: 'privacy', consentPage: 'consent' };
+  const base = {
+    products: [],
+    pages: [page('index'), privacy, consent],
+    cases: [],
+    blocks: [now, policy, requisites],
+    mockups: [],
+    site: { flags: flagsOff, consent: consentLinks },
+    env: 'production' as const,
+  };
+  const check = (patch: Partial<Parameters<typeof assertContentIntegrity>[0]>) => () =>
+    assertContentIntegrity({ ...base, ...patch });
+  /** Флаг вкл., страницы политики и согласия видимы — как после снятия черновиков. */
+  const onReady = {
+    site: { flags: flagsOn, consent: consentLinks },
+    pages: [page('index'), page('privacy', { sections: refs('privacy-policy') }), page('consent', { metrikaState: 'on' })],
+    blocks: [now, { ...policy, data: { ...policy.data, draft: false } }, requisites],
+  };
+
+  it('набор ep05 с выключенным флагом — без исключений в каждом окружении', () => {
+    for (const env of ['production', 'staging', 'development'] as const) {
+      expect(check({ env })).not.toThrow();
+    }
+    expect(check(onReady)).not.toThrow();
+  });
+
+  describe('правило 10: metrikaState видимых записей = флаг (production)', () => {
+    it('флаг вкл. и видимый блок off — ошибка с путём и обоими значениями', () => {
+      const pages = [page('index'), privacy, page('consent', { metrikaState: 'on' })];
+      expect(check({ ...onReady, pages })).toThrow(
+        /src\/content\/blocks\/privacy-now\.md: блок в секциях src\/content\/pages\/privacy\.md с metrikaState: off видим в production, а флаг Метрики — on \(site\.flags\.metrikaEnabled: true\)/,
+      );
+    });
+
+    it('то же в staging — проходит', () => {
+      const pages = [page('index'), privacy, page('consent', { metrikaState: 'on' })];
+      expect(check({ ...onReady, pages, env: 'staging' })).not.toThrow();
+    });
+
+    it('черновой блок on при выключенном флаге в production — проходит', () => {
+      expect(check({})).not.toThrow();
+    });
+
+    it('видимая страница on при выключенном флаге — ошибка', () => {
+      expect(check({ pages: [page('index'), privacy, page('consent', { metrikaState: 'on' })] })).toThrow(
+        /src\/content\/pages\/consent\.md: страница с metrikaState: on видим в production, а флаг Метрики — off/,
+      );
+    });
+
+    it('видимый блок on при выключенном флаге — ошибка', () => {
+      const blocks = [now, { ...policy, data: { ...policy.data, draft: false } }, requisites];
+      expect(check({ blocks })).toThrow(/privacy-policy\.md: блок в секциях .* metrikaState: on видим в production/);
+    });
+
+    it('блок off на черновой странице при включённом флаге — проходит', () => {
+      const pages = [...onReady.pages, page('old', { draft: true, sections: refs('privacy-now') })];
+      expect(check({ ...onReady, pages })).not.toThrow();
+    });
+
+    it('блок в секциях видимой страницы продукта тоже проверяется', () => {
+      const wms = pageProduct('wms', { sections: refs('wms-scope', 'privacy-policy') });
+      const blocks = [wmsScope, now, { ...policy, data: { ...policy.data, draft: false } }, requisites];
+      expect(check({ products: [wms], blocks, pages: [page('index'), consent] })).toThrow(
+        /privacy-policy\.md: блок в секциях src\/content\/products\/wms\.md с metrikaState: on/,
+      );
+    });
+  });
+
+  describe('правило 11: при Метрике политика и согласие видимы в окружении', () => {
+    it('флаг вкл. и черновая consent в production — ошибка с id', () => {
+      const pages = [page('index'), page('privacy', { sections: refs('privacy-policy') }), consent];
+      expect(check({ ...onReady, pages })).toThrow(/consent\.consentPage — страница «consent» не видима в окружении production/);
+    });
+
+    it('то же в staging — проходит', () => {
+      const pages = [page('index'), page('privacy', { sections: refs('privacy-policy') }), consent];
+      expect(check({ ...onReady, pages, env: 'staging' })).not.toThrow();
+    });
+
+    it('policyPage на несуществующий id — ошибка', () => {
+      const site = { flags: flagsOn, consent: { ...consentLinks, policyPage: 'nope' } };
+      expect(check({ ...onReady, site })).toThrow(/consent\.policyPage — страницы «nope» нет в src\/content\/pages/);
+    });
+
+    it('флаг вкл. без consent — ошибка', () => {
+      expect(check({ ...onReady, site: { flags: flagsOn } })).toThrow(/Метрика включена, но не задан consent/);
+    });
+
+    it('при выключенном флаге ссылки согласия не проверяются', () => {
+      expect(check({ site: { flags: flagsOff, consent: { ...consentLinks, policyPage: 'nope' } } })).not.toThrow();
+    });
+  });
+
+  describe('правило 12: реквизиты в production — только при юрлице', () => {
+    const shownRequisites = { ...requisites, data: { ...requisites.data, draft: false, metrikaState: undefined } };
+
+    it('requisites видим в production без юрлица — ошибка', () => {
+      expect(check({ blocks: [now, policy, shownRequisites] })).toThrow(
+        /privacy-requisites\.md: view: requisites видим в production \(src\/content\/pages\/privacy\.md\), а юрлицо не заведено/,
+      );
+    });
+
+    it('черновой блок requisites — проходит', () => {
+      expect(check({})).not.toThrow();
+    });
+
+    it('в staging — проходит', () => {
+      expect(check({ blocks: [now, policy, shownRequisites], env: 'staging' })).not.toThrow();
+    });
+
+    it('на черновой странице — проходит', () => {
+      const pages = [page('index'), { ...privacy, data: { ...privacy.data, draft: true } }, consent];
+      expect(check({ blocks: [now, policy, shownRequisites], pages })).not.toThrow();
+    });
+
+    it('при заведённом юрлице — проходит', () => {
+      const site = { flags: { legalEntityReady: true, metrikaEnabled: false }, consent: consentLinks };
+      expect(check({ blocks: [now, policy, shownRequisites], site })).not.toThrow();
+    });
+  });
+
+  describe('подписи реквизитов', () => {
+    const withLegal = (legal: object, legalLabels?: object) => ({ site: { flags: flagsOff, legal, legalLabels } });
+
+    it('ИНН задан, legalLabels.inn нет — ошибка; оба заданы — проходит', () => {
+      expect(check(withLegal({ inn: '7700000000' }))).toThrow(/задан legal\.inn, но нет подписи legalLabels\.inn/);
+      expect(check(withLegal({ inn: '7700000000' }, { inn: 'ИНН' }))).not.toThrow();
+    });
+
+    it.each([
+      ['ogrn', 'ogrn', '1027700000000'],
+      ['address', 'address', 'Адрес'],
+      ['piiOperator', 'operator', 'ООО «Пример»'],
+    ])('legal.%s без legalLabels.%s — ошибка', (legalField, labelField, value) => {
+      expect(check(withLegal({ [legalField]: value }, {}))).toThrow(
+        new RegExp(`задан legal\\.${legalField}, но нет подписи legalLabels\\.${labelField}`),
+      );
+    });
+
+    it('пробельное значение не требует подписи; пробельная подпись не считается', () => {
+      expect(check(withLegal({ inn: '  ' }))).not.toThrow();
+      expect(check(withLegal({ inn: '7700000000' }, { inn: ' ' }))).toThrow(/legalLabels\.inn/);
+    });
+
+    it('название юрлица подписи не требует', () => {
+      expect(check(withLegal({ entityName: 'ООО «Пример»' }))).not.toThrow();
+    });
+  });
+
+  it('маршрут js/: id с префиксом js/ — ошибка, jsx — проходит', () => {
+    expect(check({ pages: [...base.pages, page('js/consent')] })).toThrow(
+      /src\/content\/pages\/js\/consent\.md: id «js\/consent» занимает маршрут скрипта согласия \/js\/…/,
+    );
+    expect(check({ pages: [...base.pages, page('jsx')] })).not.toThrow();
   });
 });
 
