@@ -23,8 +23,8 @@ IP сервера, имя соседнего сайта и ключи в реп�
 | `nginx/00-default.conf` | `/etc/nginx/sites-available/` + симлинк в `sites-enabled/` |
 | `nginx/belkascm.ru.conf` | то же |
 | `nginx/staging.belkascm.ru.conf` | то же |
-| `nginx/belkascm-maps.conf` | то же (контекст `http`: `map` для `Cache-Control`) |
-| `nginx/snippets/*.conf` | `/etc/nginx/snippets/belkascm/` |
+| `nginx/belkascm-maps.conf` | то же (контекст `http`: `map` для `Cache-Control` и маски IP, `log_format belkascm_anon`) |
+| `nginx/snippets/*.conf` | `/etc/nginx/snippets/belkascm/` (CSP — `csp-strict.conf` или `csp-metrika.conf`, ep05) |
 | `certbot/renewal-hooks/deploy/belkascm-reload-nginx` | `/etc/letsencrypt/renewal-hooks/deploy/` (`root:root 0755`) |
 | `monitor/check-site.sh` | на сервер не ставится: его запускает `.github/workflows/monitor.yml` |
 | `deploy/ci-deploy.sh`, `deploy/smoke.sh` | на сервер не ставятся: выкладка и смоук из `.github/workflows/deploy.yml` (и отката) |
@@ -245,3 +245,74 @@ curl -s https://belkascm.ru/nope                     # 404, тело — 404.htm
 Откат шага: вернуть HTTP-версии `belkascm.ru.conf` и `staging.belkascm.ru.conf`
 из коммита `37d5aab` (T13), удалить симлинк `belkascm-maps.conf`, `nginx -t`, `reload`.
 Сертификаты и htpasswd откат не мешают.
+
+## CSP-сниппеты и журналы без полного IP (ep05 T06)
+
+Что меняется на сервере:
+
+- `snippets/security-headers.conf` — без CSP; CSP теперь ставит отдельный сниппет
+  `snippets/csp-strict.conf` (прежняя строка дословно) или `snippets/csp-metrika.conf`
+  (строгая плюс домены Метрики). Каждый HTTPS-блок подключает ровно один из них; какой —
+  задаёт `site.flags.metrikaEnabled` в `src/content/site.yaml`, согласованность держит
+  `tests/infra-csp.test.ts`.
+- `belkascm-maps.conf` — `map $remote_addr $belkascm_anon_ip` (у IPv4 последний октет — `0`,
+  у IPv6 — первые три группы) и `log_format belkascm_anon` без полного адреса. Файл должен
+  читаться раньше vhost: `log_format` объявляется до `access_log`, который на него ссылается
+  (`belkascm-maps.conf` < `belkascm.ru.conf` в порядке имён `sites-enabled`).
+- `belkascm.ru.conf`, `staging.belkascm.ru.conf` — у всех пяти server-блоков
+  `access_log … belkascm_anon` и `error_log … crit` (на уровне `error` nginx пишет
+  `client: <IP>`, в том числе при каждом неверном пароле стейджинга).
+  `00-default.conf` не меняется (`access_log off`).
+
+**Установка — одним заходом.** `security-headers.conf` общий для прода и стейджинга: если
+поставить его без новых vhost (или vhost без сниппетов), в ответах не будет CSP, а vhost без
+`belkascm-maps.conf` не пройдёт `nginx -t` (`unknown log format`). Поэтому все сниппеты,
+`belkascm-maps.conf` и оба vhost копируются вместе, затем один `nginx -t` и один `reload`.
+Проверки после — по порядку: стейджинг, затем прод.
+
+```sh
+# Под root, из временного каталога с копией infra/ нужного коммита main.
+# До: состояние чужих конфигов и копия наших текущих — для отката.
+ls -l /etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d
+sha256sum /etc/nginx/nginx.conf /etc/nginx/sites-available/*
+backup=/root/belkascm-nginx-$(date +%Y%m%d-%H%M%S)
+mkdir -p "$backup/sites" && cp -a /etc/nginx/snippets/belkascm "$backup/snippets"
+cp -a /etc/nginx/sites-available/belkascm-maps.conf /etc/nginx/sites-available/belkascm.ru.conf \
+  /etc/nginx/sites-available/staging.belkascm.ru.conf "$backup/sites/"
+
+# Установка: всё вместе, один nginx -t, один reload.
+install -o root -g root -m 0644 nginx/snippets/*.conf /etc/nginx/snippets/belkascm/
+for f in belkascm-maps.conf belkascm.ru.conf staging.belkascm.ru.conf; do
+  install -o root -g root -m 0644 "nginx/$f" "/etc/nginx/sites-available/$f"
+done
+nginx -t && systemctl reload nginx
+
+# После: те же ls и sha256sum — чужие файлы без изменений; сосед и его backend работают.
+```
+
+Проверки (стейджинг, затем прод):
+
+```sh
+# 1. Стейджинг: 401 с X-Robots-Tag и CSP, с паролем — 200; смоук стейджинга.
+curl -sI https://staging.belkascm.ru/ | grep -i 'x-robots-tag\|content-security-policy'
+STAGING_BASIC_AUTH='<user:pass>' bash infra/deploy/smoke.sh staging     # с рабочей машины
+# 2. Прод: CSP на «/» и на 404 — та же строка, что в подключённом сниппете; смоук прода.
+curl -sI https://belkascm.ru/ | grep -i content-security-policy
+curl -sI https://belkascm.ru/nope | grep -i content-security-policy
+bash infra/deploy/smoke.sh production                                    # с рабочей машины
+# 3. Журналы: у новых строк последний октет — 0; неверный пароль стейджинга в error-журнал
+#    не пишется.
+tail -n 3 /var/log/nginx/belkascm.access.log /var/log/nginx/belkascm-staging.access.log
+curl -s -o /dev/null -u x:y https://staging.belkascm.ru/ && tail -n 2 /var/log/nginx/belkascm-staging.error.log
+```
+
+Прежние журналы с полными адресами остаются в ротации (`*.log.1`, `*.log.N.gz`), пока их не
+удалит logrotate — до 14 дней. Если это важно раньше, их удаляют отдельным решением владельца.
+
+Переключение CSP на `csp-metrika.conf` (и обратно) — только вместе с флагом Метрики, по
+runbook включения Метрики в приватных документах: сначала vhost стейджинга, затем прод, затем
+промоушн. Смоук прода сверяет CSP со сборкой в одну сторону: `js/consent.js` в сборке ⇒ CSP
+разрешает `https://mc.yandex.ru`.
+
+Откат шага: вернуть файлы из `$backup` (`snippets/` → `/etc/nginx/snippets/belkascm/`,
+`sites/*` → `/etc/nginx/sites-available/`), `nginx -t`, `reload`.

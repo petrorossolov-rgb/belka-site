@@ -11,7 +11,14 @@
 #   случайный путь 404; каждый черновой маршрут 200 с плашкой «черновик».
 # production (https://belkascm.ru):
 #   «/» 200 с HSTS, CSP, nosniff и без X-Robots-Tag; robots.txt без «Disallow: /»;
-#   случайный путь и каждый черновой маршрут staging — 404; www и http — 301 на https://belkascm.ru.
+#   случайный путь — 404 с CSP; каждый черновой маршрут staging — 404; www и http — 301 на
+#   https://belkascm.ru. С --dist: если в сборке есть js/consent.js (флаг Метрики включён), CSP
+#   обязан разрешать https://mc.yandex.ru в script-src и connect-src (ep05 T06).
+# Сверка CSP со сборкой — в одну сторону: «скрипт есть, CSP его режет» ломает сайт и ловится
+# здесь. Обратное («CSP шире, флаг выкл.») держит tests/infra-csp.test.ts в репозитории: иначе
+# промоушн выключения Метрики и окно между установкой nginx и промоушном были бы красными при
+# исправном сайте (plan ep05, ревью F01). Стейджинг CSP не сверяет: выкладка по мержу PR
+# включения идёт раньше установки vhost (infra/README.md). rollback.yml зовёт смоук без --dist.
 # Код 0 — всё в порядке, 1 — хотя бы одна проверка не прошла, 2 — неверный вызов.
 # Пароль не печатается: curl получает его из файла конфигурации, в выводе — только коды.
 set -euo pipefail
@@ -83,6 +90,12 @@ fetch() {
 }
 header() { grep -i "^$1:" "$tmp/h" | head -1 | cut -d: -f2- | tr -d '\r' | sed 's/^ *//' || true; }
 body_is() { [[ -f $tmp/b ]] && cmp -s -- "$tmp/b" "$1"; }
+# Источники директивы CSP $2 из политики $1 содержат $3.
+csp_allows() {
+  local directive
+  directive=$(tr ';' '\n' <<<"$1" | sed 's/^ *//' | grep "^$2 " | head -1 || true)
+  [[ " $directive " == *" $3 "* ]]
+}
 
 random_path="/smoke-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')/"
 
@@ -108,6 +121,16 @@ else
   done
   value=$(header x-content-type-options)
   if [[ $value == nosniff ]]; then ok "x-content-type-options: nosniff"; else bad "x-content-type-options: «$value», ожидался nosniff"; fi
+  if [[ -n $dist && -f $dist/js/consent.js ]]; then
+    csp=$(header content-security-policy)
+    for directive in script-src connect-src; do
+      if csp_allows "$csp" "$directive" https://mc.yandex.ru; then
+        ok "в сборке js/consent.js, CSP $directive разрешает https://mc.yandex.ru"
+      else
+        bad "в сборке js/consent.js, а CSP $directive не разрешает https://mc.yandex.ru — Метрику заблокирует браузер"
+      fi
+    done
+  fi
 fi
 
 # --- стейджинг без пароля ---
@@ -138,6 +161,9 @@ fi
 # --- несуществующий путь ---
 code=$(fetch "${auth_args[@]}" "$base$random_path")
 if [[ $code == 404 ]]; then ok "$base$random_path → 404"; else bad "$base$random_path → ${code:-нет ответа}, ожидался 404"; fi
+if [[ $env_name == production ]]; then
+  if [[ -n $(header content-security-policy) ]]; then ok "404: есть CSP"; else bad "404: нет заголовка content-security-policy"; fi
+fi
 if [[ -n $dist ]]; then
   if body_is "$dist/404.html"; then ok "тело 404 = $dist/404.html"; else bad "тело 404 не совпадает с $dist/404.html"; fi
 fi
