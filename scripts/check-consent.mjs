@@ -264,6 +264,8 @@ export async function checkConsent({ distDir, csp = readCspMetrika(), executable
   const denyScenario = async () => {
     const { context, page, yandex } = await open();
     await go(page, '/');
+    // Окно проверки 2 — от клика: загрузки до решения — это проверка 1, не отказ.
+    yandex.splice(0);
     // Первый отказ страницу не перезагружает — ждать загрузки незачем, перезагрузка следом.
     await click(page, '[data-consent-deny]');
     await page.waitForLoadState('networkidle').catch(() => undefined);
