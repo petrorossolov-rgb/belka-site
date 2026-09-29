@@ -109,6 +109,10 @@
   --control-target: 1.5rem;                                     /* 24 × 24: минимальная цель нажатия контрола (WCAG 2.5.8) — флажок паузы мокапа */
   --link-underline-offset: 0.15em;
 
+  /* Плашка согласия (ep05, ConsentBanner.astro): внизу поверх контента, над страницей — тень и слой. */
+  --shadow-raised: var(--shadow-2);
+  --layer-consent: 10;
+
   /* Знак: пропорции lockup из guidelines/brand-logo.html (знак 64, словесный знак 30, зазор 14) */
   --logo-lockup-gap-ratio: calc(14 / 64);
   --logo-lockup-wordmark-ratio: calc(30 / 64);

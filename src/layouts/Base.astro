@@ -1,13 +1,17 @@
 ---
 // Каркас любой страницы (Constitution 2, 3, 6). Единственная точка подключения
-// скриптов — сейчас их нет: клиентского JS на сайте ноль.
+// скриптов. Клиентского JS ноль при выключенном флаге Метрики; при включённом — плашка согласия и
+// один свой файл /js/consent.js (ep05, Constitution 4). `is:inline` обязателен: без него Astro
+// обработает тег и вставит код в страницу, а CSP script-src 'self' инлайн отрежет.
 import type { ImageMetadata } from 'astro';
 import { Font } from 'astro:assets';
+import ConsentBanner from '../components/ConsentBanner.astro';
 import DraftBanner from '../components/DraftBanner.astro';
 import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
 import Seo from '../components/Seo.astro';
 import SkipLink from '../components/SkipLink.astro';
+import { getSite } from '../lib/content';
 import '../styles/global.css';
 
 interface Props {
@@ -27,6 +31,7 @@ interface Props {
 }
 
 const { title, description, draft = false, brandScreen = false, canonical = true, ogImage, ogImageAlt } = Astro.props;
+const { metrikaEnabled } = (await getSite()).flags;
 ---
 
 <!doctype html>
@@ -39,6 +44,7 @@ const { title, description, draft = false, brandScreen = false, canonical = true
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <Font cssVariable="--font-sans" preload />
     <Font cssVariable="--font-mono" />
+    {metrikaEnabled && <script is:inline src="/js/consent.js" defer></script>}
   </head>
   <body>
     <SkipLink />
@@ -48,5 +54,6 @@ const { title, description, draft = false, brandScreen = false, canonical = true
       <slot />
     </main>
     <Footer brand={!brandScreen} />
+    {metrikaEnabled && <ConsentBanner />}
   </body>
 </html>

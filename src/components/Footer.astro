@@ -2,7 +2,8 @@
 // Подвал: имя и слоган, © год сборки и имя (с русской редакцией `nameRu`, если она задана);
 // контакты, реквизиты и меню — только непустые. Реквизит — подпись из `site.legalLabels` и
 // значение как есть (`data-voice="raw"`: ИНН и ОГРН — коды, а не числа с разрядами, V4). Оператор
-// ПДн — в политике, не здесь.
+// ПДн — в политике, не здесь. Кнопка «Настройки cookie» (ep05) — только при флаге Метрики: она
+// снова показывает плашку согласия (/js/consent.js).
 import { getNav, getSite } from '../lib/content';
 import { visibleContacts, visibleLegal } from '../lib/content-core';
 
@@ -17,6 +18,7 @@ const contacts = visibleContacts(site);
 const legal = visibleLegal(site);
 const nav = await getNav('footer');
 const year = new Date().getFullYear();
+const consentSettings = site.flags.metrikaEnabled ? site.consent?.settings : undefined;
 ---
 
 <footer class="site-footer">
@@ -65,6 +67,13 @@ const year = new Date().getFullYear();
         </nav>
       )
     }
+    {
+      consentSettings && (
+        <button class="site-footer__settings" type="button" data-consent-settings>
+          {consentSettings}
+        </button>
+      )
+    }
     <p class="site-footer__copy">©&nbsp;{year} {site.name}{site.nameRu && ` · ${site.nameRu}`}</p>
   </div>
 </footer>
@@ -93,6 +102,18 @@ const year = new Date().getFullYear();
     gap: var(--space-2xs);
     padding: 0;
     list-style: none;
+  }
+
+  .site-footer__settings {
+    align-self: start;
+    min-height: var(--control-target);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-link);
+    text-decoration: underline;
+    text-underline-offset: var(--link-underline-offset);
+    cursor: pointer;
   }
 
   .site-footer__copy {
