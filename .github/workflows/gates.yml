@@ -8,6 +8,8 @@
 # и проверяет её (check-dist-seo, check-voice, check-layout, lychee): черновые
 # секции видны только в staging-сборке. Линтер голоса и гейт адаптива идут на
 # обеих сборках; check-layout открывает страницы в системном Chrome раннера.
+# Задание metrika-probe (ep05) собирает и проверяет путь «флаг Метрики вкл.» на каждом вызове;
+# оно входит в needs у gates-ok, artifacts не выгружает.
 # Artifacts: dist-production, dist-staging (только при staging),
 # draft-routes.json (черновые маршруты staging-сборки при site_env=staging,
 # иначе прод-сборки — пустой список), lhci-reports. Выкладка берёт только
@@ -198,13 +200,66 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Проба «флаг Метрики вкл.» (ep05, plan → Key Decision «Проба „флаг вкл.“»). До юрлица этот
+  # путь нигде больше не собирается. Оверлей накладывает на настоящий src/content/site.yaml в
+  # рабочей копии раннера флаги, тестовый счётчик и заведомо тестовые реквизиты; сборка — staging
+  # (черновые политика и согласие видны). Четыре гейта — те же скрипты, что у gates, плюс e2e
+  # согласия в Chrome. Artifacts не выгружаются: оверлей и сборка пробы остаются на раннере
+  # (Constitution 10). Тот же ref, что у gates: промоушн проверяет пробой выкладываемый SHA.
+  metrika-probe:
+    name: metrika-probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Проверка входа ref
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          if [[ -n "$REF" && ! "$REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::ref: ожидается пусто или SHA из 40 hex-символов, получено «$REF»"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci
+
+      - name: Оверлей site.yaml (флаг вкл., тестовые счётчик и реквизиты)
+        run: node scripts/metrika-probe-site.mjs
+
+      - name: Сборка пробы (staging)
+        env:
+          SITE_ENV: staging
+        run: npm run build -- --outDir dist-metrika
+
+      - name: check-dist-seo staging --metrika on
+        run: node scripts/check-dist-seo.mjs staging --metrika on --dist dist-metrika --out "$RUNNER_TEMP/metrika-draft-routes.json"
+
+      - name: check-voice пробы
+        run: node scripts/check-voice.mjs --dist dist-metrika --env staging
+
+      - name: check-layout пробы
+        run: node scripts/check-layout.mjs --dist dist-metrika
+
+      - name: check-consent
+        run: node scripts/check-consent.mjs --dist dist-metrika
+
   # Итог гейтов. Задание без условия было бы пропущено при упавшем гейте, а
   # пропущенное задание GitHub засчитывает required check как успех. Поэтому
   # оно запускается всегда и само падает, если хоть одно задание не success
   # (в том числе failure, cancelled, skipped). Это не обход гейта, а его замок.
   gates-ok:
     name: gates-ok
-    needs: [gates]
+    needs: [gates, metrika-probe]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
