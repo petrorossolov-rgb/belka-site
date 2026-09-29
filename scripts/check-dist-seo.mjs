@@ -13,8 +13,9 @@
 // --metrika  — режим Метрики (ep05) из источника правды, а не из сборки: в gates.yml его даёт
 //              `node scripts/lib/site-flags.mjs metrikaEnabled` по src/content/site.yaml.
 //              Обязателен, значения по умолчанию нет.
-//   off      — прежние правила плюс: нет файла js/consent.js и нет разметки плашки (элемента с
-//              атрибутом data-consent) ни на одной странице (Constitution 4: без флага нет JS).
+//   off      — прежние правила плюс: нет файла js/consent.js, нет разметки плашки (элемента с
+//              атрибутом data-consent) и кнопок согласия (data-consent-settings, -allow, -deny) ни
+//              на одной странице (Constitution 4: без флага нет JS).
 //   on       — на каждой HTML-странице ровно один <script src="/js/consent.js" defer> без тела и
 //              без других атрибутов; файл js/consent.js есть; <noscript> запрещён (пиксель
 //              Метрики без согласия); любой другой <script>, кроме JSON-LD, запрещён, как раньше.
@@ -33,6 +34,8 @@ export const METRIKA_MODES = ['on', 'off'];
 /** Скрипт согласия (ep05): единственный клиентский JS сайта, только при включённой Метрике. */
 export const CONSENT_SCRIPT = '/js/consent.js';
 const CONSENT_FILE = CONSENT_SCRIPT.slice(1);
+/** Кнопки согласия: при выключенной Метрике их, как и плашки, в сборке нет. */
+const CONSENT_CONTROLS = ['data-consent-settings', 'data-consent-allow', 'data-consent-deny'];
 
 /** Предел веса картинки превью: карточку с картинкой тяжелее 300 КБ WhatsApp не показывает. */
 export const OG_IMAGE_MAX_BYTES = 300 * 1024;
@@ -231,7 +234,8 @@ export function checkDistSeo({ distDir, env, metrika }) {
 }
 
 /**
- * Разметка согласия на странице (ep05). «Выкл.»: ни одного элемента с `data-consent`. «Вкл.»:
+ * Разметка согласия на странице (ep05). «Выкл.»: ни одного элемента с `data-consent` и кнопок
+ * согласия `data-consent-*` (T10). «Вкл.»:
  * ровно один `<script src="/js/consent.js" defer>` — только эти два атрибута, без тела; без
  * `<noscript>`. Прочие скрипты проверяет `checkPageInvariants`, как раньше.
  */
@@ -241,6 +245,12 @@ function checkConsentMarkup(/** @type {string} */ file, /** @type {string} */ ht
   if (!metrikaOn) {
     for (const tag of tagsWithAttr(html, 'data-consent')) {
       errors.push(`${file}: разметка плашки согласия <${tag.name} data-consent> в сборке, а Метрика выключена (маршрут ${routeOf(file)})`);
+    }
+    // Кнопки согласия (ep05 T10): «Настройки cookie» в подвале, «Разрешить» и «Отказаться».
+    for (const attr of CONSENT_CONTROLS) {
+      for (const tag of tagsWithAttr(html, attr)) {
+        errors.push(`${file}: элемент согласия <${tag.name} ${attr}> в сборке, а Метрика выключена (маршрут ${routeOf(file)})`);
+      }
     }
     return errors;
   }

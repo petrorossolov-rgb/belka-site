@@ -462,6 +462,25 @@ describe('check-dist-seo: режим Метрики «выкл.» (ep05)', () =>
     ]);
   });
 
+  // ep05 T10: REVIEWER.md обещает, что при выключенном флаге нет и кнопки «Настройки cookie» —
+  // элемент с атрибутом data-consent-* (settings, allow, deny) тоже разметка согласия.
+  it('кнопка «Настройки cookie» <button data-consent-settings> без плашки → ошибка своим сообщением', () => {
+    const dir = fixture('production');
+    edit(dir, 'index.html', (html) => html.replace('</body>', '<footer><button type="button" data-consent-settings>Настройки</button></footer></body>'));
+    expect(check(dir, 'production').errors).toEqual([
+      'index.html: элемент согласия <button data-consent-settings> в сборке, а Метрика выключена (маршрут /)',
+    ]);
+  });
+
+  it('data-consent-allow и data-consent-deny ловятся по одному разу; data-consented — нет', () => {
+    const dir = fixture('staging');
+    edit(dir, 'index.html', (html) => html.replace('</body>', '<button data-consent-allow>Да</button><button data-consent-deny>Нет</button><div data-consented></div></body>'));
+    expect(check(dir, 'staging').errors).toEqual([
+      'index.html: элемент согласия <button data-consent-allow> в сборке, а Метрика выключена (маршрут /)',
+      'index.html: элемент согласия <button data-consent-deny> в сборке, а Метрика выключена (маршрут /)',
+    ]);
+  });
+
   it('положительная пара: текущая dist-production проходит в «выкл.» и падает в «вкл.»', () => {
     expect(check(fixture('production'), 'production', 'off').errors).toEqual([]);
     expect(check(fixture('production'), 'production', 'on').errors).toContain(
