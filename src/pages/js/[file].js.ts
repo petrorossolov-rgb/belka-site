@@ -8,7 +8,13 @@ import { getSite } from '../../lib/content';
 
 export const prerender = true;
 
-const FILES: Record<string, string> = { consent };
+// ПРОБА ep05 T10 (не мержить): в сборку уходит скрипт, который грузит tag.js до решения. Правка —
+// здесь, а не в consent.mjs: тесты читают исходник, и упасть должно только задание metrika-probe.
+const PROBE_FROM = '  if (choice === undefined) banner.hidden = false;\n';
+if (!consent.includes(PROBE_FROM)) throw new Error('проба T10 не применилась');
+const FILES: Record<string, string> = {
+  consent: consent.replace(PROBE_FROM, '  if (choice === undefined) {\n    banner.hidden = false;\n    load();\n  }\n'),
+};
 
 export const getStaticPaths = (async () => {
   const site = await getSite();
