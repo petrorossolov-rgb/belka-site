@@ -148,6 +148,31 @@ describe('check-voice: сбор текста', () => {
   });
 });
 
+// ep05 T08: плашка согласия — `<aside hidden data-consent>`, её показывает скрипт. Узкое правило:
+// `hidden` вместе с `data-consent` проверяется, любой другой `hidden` пропускается, как раньше.
+describe('check-voice: плашка согласия (hidden + data-consent)', () => {
+  it('нарушение внутри <aside hidden data-consent> ловится своим правилом', () => {
+    expect(rules('<aside hidden data-consent><h2>Cookie</h2><p>Склад работает!</p></aside>')).toEqual(['V1']);
+    expect(rules('<aside hidden data-consent aria-labelledby="t"><p>Разрешить — «да»...</p></aside>')).toEqual(['V10']);
+  });
+
+  it('положительная пара: тот же текст в обычном hidden пропускается', () => {
+    expect(rules('<div hidden><p>Склад работает!</p></div>')).toEqual([]);
+    expect(rules('<aside hidden data-other><p>Склад работает!</p></aside>')).toEqual([]);
+  });
+
+  it('обычный hidden внутри плашки по-прежнему пропускается', () => {
+    expect(rules('<aside hidden data-consent><p>Склад.</p><p hidden>Склад работает!</p></aside>')).toEqual([]);
+  });
+
+  it('текст <button> — отдельный блок, нарушение в кнопке ловится', () => {
+    const segments = collectSegments(page('<aside hidden data-consent><p>Текст плашки.</p><button type="button">Разрешить</button><button type="button">Отказаться</button></aside>'));
+    expect(segments.map((s) => s.text)).toEqual(['Склад', 'Текст плашки.', 'Разрешить', 'Отказаться']);
+    expect(rules('<aside hidden data-consent><p>Текст.</p><button type="button">Разрешить!</button></aside>')).toEqual(['V1']);
+    expect(rules('<footer><button type="button" data-consent-settings>Настройки!</button></footer>')).toEqual(['V1']);
+  });
+});
+
 describe('V1 — нет восклицаний', () => {
   it('! в тексте, alt и <title> падает', () => {
     expect(rules('<p>Склад готов!</p>')).toEqual(['V1']);

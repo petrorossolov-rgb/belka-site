@@ -1,0 +1,106 @@
+---
+// Плашка согласия на cookie и Метрику (ep05 T08). Выводит её только Base.astro и только при
+// site.flags.metrikaEnabled. В разметке она скрыта (`hidden`): показывает её /js/consent.js, если
+// решения ещё нет или сменилась версия текста. Две кнопки одного класса — отказ равноценен
+// согласию (Constitution 4). Строки — site.consent, ссылки — на страницы политики и согласия
+// (их видимость держит правило целостности 11). Раскладка — внизу поверх контента (выбор — T11).
+import { getSite } from '../lib/content';
+import { pageHref } from '../lib/content-core';
+
+/** Счётчик Метрики — внешний скрипт своего адреса; домены разрешает csp-metrika.conf. */
+const METRIKA_TAG = 'https://mc.yandex.ru/metrika/tag.js';
+
+const site = await getSite();
+const consent = site.consent;
+if (!consent) throw new Error('ConsentBanner: нет site.consent (схема требует его при metrikaEnabled)');
+---
+
+<aside
+  class="consent"
+  hidden
+  data-consent
+  aria-labelledby="consent-title"
+  data-counter={site.metrika.counterId}
+  data-version={consent.version}
+  data-tag={METRIKA_TAG}
+>
+  <div class="container consent__inner">
+    <h2 class="consent__title" id="consent-title">{consent.title}</h2>
+    <p class="consent__text">{consent.text}</p>
+    <p class="consent__links">
+      <a href={pageHref(consent.policyPage)}>{consent.policyLink}</a>
+      <a href={pageHref(consent.consentPage)}>{consent.consentLink}</a>
+    </p>
+    <div class="consent__actions">
+      <button class="consent__button" type="button" data-consent-allow>{consent.allow}</button>
+      <button class="consent__button" type="button" data-consent-deny>{consent.deny}</button>
+    </div>
+  </div>
+</aside>
+
+<style>
+  /* Компактно: при предельных длинах строк (LIMITS) плашка на 360 × 800 не выше трети окна —
+     это проверка 6 check-consent. Кнопки — одного класса и одной ширины
+     (по длинной подписи): отказ не слабее согласия. */
+  .consent {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: var(--layer-consent);
+    border-block-start: var(--border-width) solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-raised);
+    color: var(--color-text);
+    font-size: var(--text-eyebrow);
+    line-height: var(--leading-snug);
+  }
+
+  .consent[hidden] {
+    display: none;
+  }
+
+  .consent__inner {
+    display: grid;
+    gap: var(--space-2xs);
+    padding-block: var(--space-xs);
+  }
+
+  .consent__title {
+    font-size: var(--text-small);
+    line-height: var(--leading-snug);
+  }
+
+  .consent__text {
+    max-width: var(--measure);
+  }
+
+  .consent__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-md);
+  }
+
+  .consent__actions {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: var(--space-xs);
+    justify-self: start;
+    margin-block-start: var(--space-2xs);
+  }
+
+  .consent__button {
+    min-height: var(--control-target);
+    padding: var(--space-2xs) var(--space-sm);
+    border: var(--border-width) solid var(--color-text);
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+  }
+
+  .consent__button:hover {
+    background: var(--color-bg);
+  }
+</style>

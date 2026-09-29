@@ -2,6 +2,7 @@
 node_modules/
 /dist/
 /dist-staging/
+/dist-metrika/
 draft-routes.json
 .astro/
 

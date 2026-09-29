@@ -9,6 +9,9 @@
 // Исключение — только атрибутом data-voice="raw" в разметке: снимает V3, V4, V10 в поддереве,
 // остальные правила действуют и внутри. Строки JSON-LD проверяются как метаданные, кроме служебных
 // ключей (адреса, типы, контакты). V9 — только production и --text.
+// Невидимое (hidden, script, style, code, pre, template, noscript, textarea) не проверяется. Узкое
+// исключение (ep05 T08): элемент с hidden и data-consent — плашка согласия, её показывает скрипт,
+// поэтому её текст проверяется, как видимый. Текст <button> — отдельный блок.
 // Код 1 — нарушения, код 2 — ошибка вызова.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
@@ -289,7 +292,9 @@ export function collectSegments(html) {
         segments.push(...jsonLdSegments(child.childNodes.map((n) => ('value' in n ? n.value : '')).join(''), elRaw));
         continue;
       }
-      if (attrs.has('hidden') || SKIP.has(child.tagName)) {
+      // Плашку согласия (`hidden` + `data-consent`) показывает скрипт — её текст проверяется.
+      const hidden = attrs.has('hidden') && !attrs.has('data-consent');
+      if (hidden || SKIP.has(child.tagName)) {
         if (inline || child.tagName === 'code') buffer.push({ ch: PLACEHOLDER, raw: elRaw });
         else flush();
         continue;
